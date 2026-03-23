@@ -29,7 +29,7 @@ if st.button("Get Answer"):
         st.warning("Please enter a question first!")
      else:
          with st.spinner("Thinking... ⏳"):
-             docs = db.similarity_search(query, k=3)
+             docs = db.similarity_search(query, k=1)
 
              if len(docs)==0:
                  st.error("No relevant information found in the database.")
@@ -56,9 +56,15 @@ if st.button("Get Answer"):
              Answer clearly:
              """
 
-             response = llm.invoke(prompt).strip()
-             response = "\n".join(response.split("\n")[:5])  # Limit to 3 lines
-
+             try:
+                 response = llm.invoke(prompt)
+                 if not response:
+                     answer = " No clear found inn manual."
+                 else:
+                     answer = response.strip()
+                     answer = "\n".join(response.split("\n")[:4]) 
+             except:
+                answer = "Model is taking too long. Please try another question."
              st.subheader("AI Answer:")
              st.write(response)
 
