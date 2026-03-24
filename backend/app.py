@@ -1,74 +1,42 @@
 import streamlit as st
-from langchain_chroma import Chroma
-from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_ollama import OllamaLLM
+from query import get_answer
 
-#step 1: Load embeddings
-embeddings = HuggingFaceEmbeddings(
-    model_name="sentence-transformers/all-mpnet-base-v2"
-)
-#Load the vector database
-db = Chroma(
-    persist_directory="../vectorstore",
-    embedding_function=embeddings
-)
+st.set_page_config(page_title="EV Assistant", layout="wide")
 
-#Load model
-llm = OllamaLLM(model = "phi")
+# Styling (ChatGPT-like)
+st.markdown("""
+<style>
+body {
+    background-color: #0e1117;
+    color: white;
+}
+</style>
+""", unsafe_allow_html=True)
 
-#UI Title
 st.title("🚗 EV Diagnostic Assistant")
 
-#Ask a question
-query = st.text_input("Ask your EV question: ")
+# Chat history
+if "messages" not in st.session_state:
+    st.session_state.messages = []
 
-#Input box
-if st.button("Get Answer"):
+# Display chat
+for msg in st.session_state.messages:
+    with st.chat_message(msg["role"]):
+        st.write(msg["content"])
 
-     if query.strip() == "":
-        st.warning("Please enter a question first!")
-     else:
-         with st.spinner("Thinking... ⏳"):
-             docs = db.similarity_search(query, k=1)
+# Input
+query = st.chat_input("Ask your EV question...")
 
-             if len(docs)==0:
-                 st.error("No relevant information found in the database.")
-             else:
-               context = ""
-               sources = []
+if query:
+    # User message
+    st.session_state.messages.append({"role": "user", "content": query})
+    with st.chat_message("user"):
+        st.write(query)
 
-             for doc in docs:
-                context += doc.page_content + "\n\n"
-                page = doc.metadata.get("page", "N/A")
-                sources.append(f"Page {page}")
+    # AI response
+    with st.chat_message("assistant"):
+        with st.spinner("Thinking..."):
+            answer = get_answer(query)
+            st.write(answer)
 
-             prompt = f"""
-             You are an EV diagnostic assistant.
-
-             Answer ONLY based on context.
-             Give clear steps.
-
-             Context:
-             {context}
-
-             Question: {query}
-            
-             Answer clearly:
-             """
-
-             try:
-                 response = llm.invoke(prompt)
-                 if not response:
-                     answer = " No clear found inn manual."
-                 else:
-                     answer = response.strip()
-                     answer = "\n".join(response.split("\n")[:4]) 
-             except:
-                answer = "Model is taking too long. Please try another question."
-             st.subheader("AI Answer:")
-             st.write(response)
-
-             st.subheader("Sources:")
-             for s in sources:
-                 st.write(s)
-
+    st.session_state.messages.append({"role": "assistant", "content": answer})

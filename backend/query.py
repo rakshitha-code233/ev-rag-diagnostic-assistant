@@ -1,53 +1,65 @@
-from langchain_chroma import Chroma
-from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_ollama import OllamaLLM
+from langchain_chroma import Chroma
+from langchain_huggingface import HuggingFaceEmbeddings
 
-# Step 1: Load the vector database
-embeddings = HuggingFaceEmbeddings()
+# Load embedding + DB
+embeddings = HuggingFaceEmbeddings(
+    model_name="sentence-transformers/all-mpnet-base-v2"
+)
 
-#Load the vector database
 db = Chroma(
-    persist_directory="../vectorstore",
+    persist_directory="vectorstore",
     embedding_function=embeddings
 )
 
-#load LLM(OpenAI)
-llm = OllamaLLM(model = "phi")
+llm = OllamaLLM(model="phi")
 
-#Ask a question
-query = input("Ask your question: ")
+def get_answer(query):
+    try:
+        # STEP 1: Search from PDF
+        docs = db.similarity_search(query, k=2)
 
-#step 1 : Retrieve relevant docs
-docs = db.similarity_search(query, k=1)
+        if len(docs) > 0:
+            context = " ".join([doc.page_content for doc in docs])
 
-#step 2 : combine context
-context = docs[0].page_content[:500]
-
-#step 3 : crete prompt
-prompt = f"""
+            prompt = f"""
 You are an EV diagnostic assistant.
 
 STRICT RULES:
-- Answer ONLY the question
-- Use ONLY the given context
-- Do NOT add extra explanation
-- Do NOT create stories or examples
-- Stop after giving answer
-- Maximum 3 lines
+- Answer ONLY using the given context
+- If answer not in context → say "Not found in manual"
+- Keep answer within 2-3 lines
+- DO NOT create stories, puzzles, or extra content
 
 Context:
 {context}
 
 Question: {query}
 
-Answer clearly:
+Answer:
 """
 
-#step 4 : get AI answer
-response = llm.invoke(prompt).strip()
+            response = llm.invoke(prompt)
 
-#keep only first 3 lines
-response = "\n".join(response.split("\n")[:3])  # Limit to 3 lines
+            if response and "not found" not in response.lower():
+                return response.strip()
 
-print(f"\nAI Answer:\n")
-print(response) 
+        # STEP 2: General EV answer (fallback)
+        fallback_prompt = f"""
+You are an EV expert.
+
+STRICT RULES:
+- Answer only about electric vehicles
+- Keep answer short (1-2 lines)
+- No puzzles, no extra explanations
+
+Question: {query}
+
+Answer:
+"""
+
+        response = llm.invoke(fallback_prompt)
+        return response.strip()
+
+    except Exception as e:
+        return f"Error: {str(e)}"
