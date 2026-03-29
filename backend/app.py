@@ -1,11 +1,14 @@
 import streamlit as st
 import sqlite3
 from query import get_answer
+import os
 
-st.set_page_config(page_title="EV Assistant", layout="wide")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# ---------- DATABASE ----------
-conn = sqlite3.connect("users.db", check_same_thread=False)
+# go to project root → then database folder
+db_path = os.path.join(BASE_DIR, "..", "database", "users.db")
+
+conn = sqlite3.connect(db_path, check_same_thread=False)
 c = conn.cursor()
 
 c.execute("""
