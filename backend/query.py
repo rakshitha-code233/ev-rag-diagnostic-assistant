@@ -1,6 +1,7 @@
-from langchain_ollama import OllamaLLM
 from langchain_chroma import Chroma
 from langchain_huggingface import HuggingFaceEmbeddings
+def get_answer(query):
+    return f"This is a demo answer for: {query}"
 
 # Load embedding + DB
 embeddings = HuggingFaceEmbeddings(
