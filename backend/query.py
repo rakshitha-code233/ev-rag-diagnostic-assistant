@@ -21,4 +21,4 @@ def get_answer(query):
         return response
 
     except Exception as e:
-        return f"Error: {str(e)}"
+        return f"DEBUG: {str(e)}"
