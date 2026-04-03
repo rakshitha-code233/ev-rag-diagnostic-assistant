@@ -3,7 +3,8 @@ import requests
 
 def get_answer(query):
     try:
-        API_URL = "https://api-inference.huggingface.co/models/google/flan-t5-base"
+        API_URL = "https://router.huggingface.co/hf-inference/models/google/flan-t5-base"
+
         headers = {
             "Authorization": f"Bearer {os.getenv('HF_TOKEN')}"
         }
@@ -15,7 +16,6 @@ def get_answer(query):
         response = requests.post(API_URL, headers=headers, json=payload)
         result = response.json()
 
-        # Extract output safely
         if isinstance(result, list):
             return result[0].get("generated_text", "No response")
 
