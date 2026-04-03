@@ -6,18 +6,16 @@ def get_answer(query):
         token = os.getenv("HF_TOKEN")
 
         client = InferenceClient(
-            model="HuggingFaceH4/zephyr-7b-beta",   # ✅ FREE WORKING MODEL
+            model="google/flan-t5-base",   # ✅ WORKS FREE
             token=token
         )
 
-        response = client.chat_completion(
-            messages=[
-                {"role": "user", "content": query}
-            ],
-            max_tokens=150
+        response = client.text_generation(
+            query,
+            max_new_tokens=100
         )
 
-        return response.choices[0].message["content"]
+        return response
 
     except Exception as e:
         return f"DEBUG: {str(e)}"
