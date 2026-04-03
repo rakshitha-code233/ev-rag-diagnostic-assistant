@@ -5,11 +5,8 @@ def get_answer(query):
     try:
         token = os.getenv("HF_TOKEN")
 
-        if not token:
-            return "Error: API key not found"
-
         client = InferenceClient(
-            model="mistralai/Mistral-7B-Instruct-v0.2",
+            model="HuggingFaceH4/zephyr-7b-beta",   # ✅ FREE WORKING MODEL
             token=token
         )
 
