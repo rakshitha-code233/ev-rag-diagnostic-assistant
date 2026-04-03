@@ -13,12 +13,14 @@ def get_answer(query):
             token=token
         )
 
-        response = client.text_generation(
-            query,
-            max_new_tokens=150
+        response = client.chat_completion(
+            messages=[
+                {"role": "user", "content": query}
+            ],
+            max_tokens=150
         )
 
-        return response
+        return response.choices[0].message["content"]
 
     except Exception as e:
         return f"DEBUG: {str(e)}"
