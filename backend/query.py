@@ -1,21 +1,25 @@
 import os
-from huggingface_hub import InferenceClient
+import requests
 
 def get_answer(query):
     try:
-        token = os.getenv("HF_TOKEN")
+        API_URL = "https://api-inference.huggingface.co/models/google/flan-t5-base"
+        headers = {
+            "Authorization": f"Bearer {os.getenv('HF_TOKEN')}"
+        }
 
-        client = InferenceClient(
-            model="google/flan-t5-base",   # ✅ WORKS FREE
-            token=token
-        )
+        payload = {
+            "inputs": query
+        }
 
-        response = client.text_generation(
-            query,
-            max_new_tokens=100
-        )
+        response = requests.post(API_URL, headers=headers, json=payload)
+        result = response.json()
 
-        return response
+        # Extract output safely
+        if isinstance(result, list):
+            return result[0].get("generated_text", "No response")
+
+        return str(result)
 
     except Exception as e:
-        return f"DEBUG: {str(e)}"
+        return f"Error: {str(e)}"
