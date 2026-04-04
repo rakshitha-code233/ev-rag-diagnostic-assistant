@@ -1,39 +1,27 @@
 from langchain_community.document_loaders import PyPDFLoader
-from langchain_text_splitters import CharacterTextSplitter
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import Chroma
-import os
+from langchain_community.embeddings import HuggingFaceEmbeddings
 
-# Step 1: Load PDF documents
-folder_path = "../data/manuals"
-all_docs = []
+# Load PDF
+loader = PyPDFLoader("../data/manuals/tesla_model3.pdf")
+documents = loader.load()
 
-for file in os.listdir(folder_path):
-    if file.endswith(".pdf"):
-        path = os.path.join(folder_path, file)
-        loader = PyPDFLoader(path)
-        docs = loader.load()
-        all_docs.extend(docs)
-
-print("Loaded pages:", len(all_docs))
-
-# Step 2: Split documents into smaller chunks
-text_splitter = CharacterTextSplitter(
-    chunk_size=500, 
+# Split text
+text_splitter = RecursiveCharacterTextSplitter(
+    chunk_size=500,
     chunk_overlap=50
 )
+docs = text_splitter.split_documents(documents)
 
-texts = text_splitter.split_documents(all_docs)
-print("Split into chunks:", len(texts))
-
-# Step 3: Create embeddings
-embeddings = HuggingFaceEmbeddings()
-
-# Step 4: Store in Chroma vector database
-vector_db = Chroma.from_documents(
-    texts, 
-    embeddings, 
-    persist_directory="../vectorstore"
+# Create embeddings
+embedding = HuggingFaceEmbeddings(
+    model_name="sentence-transformers/all-MiniLM-L6-v2"
 )
 
-print("Embeddings stored successfully!")
+# Store in vector DB
+db = Chroma.from_documents(docs, embedding, persist_directory="../database")
+
+db.persist()
+
+print("✅ Data embedded successfully!")
