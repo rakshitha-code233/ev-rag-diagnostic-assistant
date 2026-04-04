@@ -20,7 +20,7 @@ embedding = HuggingFaceEmbeddings(
 )
 
 # Store in vector DB
-db = Chroma.from_documents(docs, embedding, persist_directory="../database")
+db = Chroma.from_documents(docs, embedding, persist_directory="../database/chroma")
 
 db.persist()
 
