@@ -18,7 +18,11 @@ db = Chroma(
 def get_answer(query):
     try:
         # 🔍 STEP 1: Search in PDF
-        docs = db.similarity_search(query, k=2)
+        docs = db.similarity_search(query, k=3)
+
+         # If no useful data found
+        if not docs:
+            return "I don't have information in the manual."
 
         context = " ".join([doc.page_content for doc in docs])
 
@@ -37,6 +41,7 @@ Context:
 
 Question:
 {query}
+
 
 Answer clearly and step-by-step.
 """
