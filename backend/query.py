@@ -5,13 +5,14 @@ from groq import Groq
 from langchain_community.vectorstores import Chroma
 from langchain_community.embeddings import HuggingFaceEmbeddings
 
-# Load vector DB
+# Load embeddings
 embedding = HuggingFaceEmbeddings(
     model_name="sentence-transformers/all-MiniLM-L6-v2"
 )
 
+# Load vector DB (IMPORTANT PATH)
 db = Chroma(
-    persist_directory="../database",
+    persist_directory="../database/chroma",
     embedding_function=embedding
 )
 
@@ -20,20 +21,26 @@ def get_answer(query):
         # 🔍 STEP 1: Search in PDF
         docs = db.similarity_search(query, k=3)
 
-         # If no useful data found
+        # If nothing found
         if not docs:
             return "I don't have information in the manual."
 
+        # Create context
         context = " ".join([doc.page_content for doc in docs])
 
-        # 🤖 STEP 2: Send to AI
+        # If context empty
+        if context.strip() == "":
+            return "I don't have information in the manual."
+
+        # 🤖 STEP 2: AI call
         client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
         final_prompt = f"""
 You are an EV diagnostic assistant.
 
 Use ONLY the below context to answer.
-If the answer is not in the context, say:
+Do NOT use your own knowledge.
+If answer is not in context, say:
 "I don't have information in the manual."
 
 Context:
@@ -41,7 +48,6 @@ Context:
 
 Question:
 {query}
-
 
 Answer clearly and step-by-step.
 """
