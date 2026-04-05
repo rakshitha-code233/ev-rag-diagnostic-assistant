@@ -1,105 +1,104 @@
 import streamlit as st
-import sqlite3
 from query import get_answer
-import os
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+st.set_page_config(page_title="EV Assistant", layout="centered")
 
-# go to project root → then database folder
-db_path = os.path.join(BASE_DIR, "..", "database", "users.db")
+# 🎨 PREMIUM CSS
+st.markdown("""
+<style>
 
-conn = sqlite3.connect(db_path, check_same_thread=False)
-c = conn.cursor()
+/* Main background */
+.stApp {
+    background-color: #0b1120;
+    color: #e5e7eb;
+}
 
-c.execute("""
-CREATE TABLE IF NOT EXISTS users (
-    username TEXT PRIMARY KEY,
-    password TEXT
-)
-""")
-conn.commit()
+/* Title */
+h1 {
+    text-align: center;
+    color: #3b82f6;
+    font-weight: 600;
+    margin-bottom: 20px;
+}
 
-# ---------- SESSION ----------
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
-if "page" not in st.session_state:
-    st.session_state.page = "login"
+/* Chat container spacing */
+.block-container {
+    padding-top: 2rem;
+}
 
-# ---------- SIGNUP ----------
-def signup():
-    st.title("📝 Create Account")
+/* User message */
+.user-msg {
+    background: #3b82f6;
+    color: white;
+    padding: 12px;
+    border-radius: 12px;
+    margin: 8px 0;
+    width: fit-content;
+    max-width: 75%;
+    margin-left: auto;
+    font-size: 15px;
+}
 
-    new_user = st.text_input("Username")
-    new_pass = st.text_input("Password", type="password")
+/* Bot message */
+.bot-msg {
+    background: #111827;
+    border: 1px solid #1f2937;
+    color: #e5e7eb;
+    padding: 12px;
+    border-radius: 12px;
+    margin: 8px 0;
+    width: fit-content;
+    max-width: 75%;
+    font-size: 15px;
+}
 
-    if st.button("Signup"):
-        try:
-            c.execute("INSERT INTO users VALUES (?, ?)", (new_user, new_pass))
-            conn.commit()
-            st.success("Account created! Now login ✅")
-            st.session_state.page = "login"
-        except:
-            st.error("Username already exists ❌")
+/* Input box */
+textarea {
+    background-color: #111827 !important;
+    color: #e5e7eb !important;
+    border-radius: 10px !important;
+    border: 1px solid #1f2937 !important;
+}
 
-    if st.button("Back to Login"):
-        st.session_state.page = "login"
+/* Scrollbar */
+::-webkit-scrollbar {
+    width: 6px;
+}
+::-webkit-scrollbar-thumb {
+    background: #1f2937;
+    border-radius: 10px;
+}
 
-# ---------- LOGIN ----------
-def login():
-    st.title("🔐 Login")
+/* Remove Streamlit footer */
+footer {
+    visibility: hidden;
+}
 
-    user = st.text_input("Username")
-    password = st.text_input("Password", type="password")
+</style>
+""", unsafe_allow_html=True)
 
-    if st.button("Login"):
-        c.execute("SELECT * FROM users WHERE username=? AND password=?", (user, password))
-        result = c.fetchone()
+# 🚗 Title
+st.title("🚗 EV Diagnostic Assistant")
 
-        if result:
-            st.session_state.logged_in = True
-            st.success("Login Successful ✅")
-            st.rerun()
-        else:
-            st.error("Invalid credentials ❌")
+# 💬 Chat history
+if "messages" not in st.session_state:
+    st.session_state.messages = []
 
-    if st.button("Create Account"):
-        st.session_state.page = "signup"
-
-# ---------- CHAT ----------
-def chat():
-    st.title("🚗 EV Assistant")
-
-    if st.button("Logout"):
-        st.session_state.logged_in = False
-        st.rerun()
-
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
-
-    for msg in st.session_state.messages:
-        with st.chat_message(msg["role"]):
-            st.write(msg["content"])
-
-    user_input = st.chat_input("Ask your EV question...")
-
-    if user_input:
-        st.session_state.messages.append({"role": "user", "content": user_input})
-
-        with st.chat_message("user"):
-            st.write(user_input)
-
-        with st.chat_message("assistant"):
-            with st.spinner("Thinking..."):
-                response = get_answer(user_input)
-                st.write(response)
-
-        st.session_state.messages.append({"role": "assistant", "content": response})
-
-# ---------- NAVIGATION ----------
-if not st.session_state.logged_in:
-    if st.session_state.page == "login":
-        login()
+# Display messages
+for msg in st.session_state.messages:
+    if msg["role"] == "user":
+        st.markdown(f"<div class='user-msg'>{msg['content']}</div>", unsafe_allow_html=True)
     else:
-        signup()
-else:
-    chat()
+        st.markdown(f"<div class='bot-msg'>{msg['content']}</div>", unsafe_allow_html=True)
+
+# Input
+query = st.chat_input("Ask your EV question...")
+
+if query:
+    st.session_state.messages.append({"role": "user", "content": query})
+
+    answer = get_answer(query)
+
+    st.session_state.messages.append({"role": "assistant", "content": answer})
+
+    st.rerun()
