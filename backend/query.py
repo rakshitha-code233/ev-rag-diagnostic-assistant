@@ -4,11 +4,11 @@ from groq import Groq
 from langchain_chroma import Chroma
 from langchain_huggingface import HuggingFaceEmbeddings
 
-# 📁 Path fix (VERY IMPORTANT for Streamlit)
+# 📁 Path fix
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "../database")
 
-# 🔗 Load embedding model
+# 🔗 Embedding model
 embedding = HuggingFaceEmbeddings(
     model_name="sentence-transformers/all-MiniLM-L6-v2"
 )
@@ -21,27 +21,35 @@ db = Chroma(
 
 def get_answer(query):
     try:
-        # 🟢 Handle simple chat
-        if query.lower() in ["hi", "hello"]:
+        query_lower = query.lower()
+
+        # 🟢 Smart chat handling
+        if query_lower in ["hi", "hello"]:
             return "Hello! Ask me about EV diagnostics."
 
-        # 🔍 Step 1: Retrieve data
+        if query_lower in ["thank you", "thanks"]:
+            return "You're welcome! Happy to help with EV diagnostics."
+
+        if "your name" in query_lower:
+            return "I am an EV Diagnostic Assistant designed to help with vehicle manuals."
+
+        # 🔍 Retrieve docs
         docs = db.similarity_search(query, k=5)
 
         if not docs:
             return "I don't have information in the manual."
 
-        # 📄 Build context with page info
+        # 📄 Build context with page numbers
         context = "\n\n".join([
             f"(Page {doc.metadata.get('page', 'N/A')})\n{doc.page_content}"
             for doc in docs
         ])
 
-        # ❌ Weak context check
+        # ❌ Weak context
         if len(context.strip()) < 50:
             return "I don't have information in the manual."
 
-        # 🤖 Step 2: LLM call
+        # 🤖 LLM call
         client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
         final_prompt = f"""
