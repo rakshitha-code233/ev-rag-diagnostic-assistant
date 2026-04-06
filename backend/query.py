@@ -2,14 +2,12 @@ import os
 from groq import Groq
 
 from langchain_community.vectorstores import Chroma
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_community.embeddings import FakeEmbeddings
+from db import search_knowledge
 
-# Load embeddings
-embedding = HuggingFaceEmbeddings(
-    model_name="sentence-transformers/all-MiniLM-L6-v2"
-)
+# ✅ SAFE embedding (no crash)
+embedding = FakeEmbeddings(size=384)
 
-# Load DB
 db = Chroma(
     persist_directory="../database",
     embedding_function=embedding
@@ -17,31 +15,41 @@ db = Chroma(
 
 
 def get_answer(query):
+    query_lower = query.lower()
+
+    # -------- GREETINGS --------
+    if query_lower in ["hi", "hello", "hey"]:
+        return "Hello 👋 How can I help you?"
+
+    if "thank" in query_lower:
+        return "You're welcome 😊"
+
+    # -------- CUSTOM KNOWLEDGE --------
+    custom = search_knowledge(query)
+    if custom:
+        return custom
+
     try:
         docs = db.similarity_search(query, k=3)
 
-        # If nothing found
         if not docs:
-            return "I don't have information in the manual."
+            return "NOT_FOUND"
 
         context = " ".join([doc.page_content for doc in docs])
 
         client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
         prompt = f"""
-You are an EV diagnostic assistant.
+You are an EV assistant.
 
-Use ONLY the below context to answer.
-If answer not found, say:
-"I don't have information in the manual."
+Use ONLY the context.
+If not found return: NOT_FOUND
 
 Context:
 {context}
 
 Question:
 {query}
-
-Answer clearly step-by-step.
 """
 
         response = client.chat.completions.create(
@@ -49,7 +57,9 @@ Answer clearly step-by-step.
             messages=[{"role": "user", "content": prompt}]
         )
 
-        return response.choices[0].message.content
+        answer = response.choices[0].message.content.strip()
 
-    except Exception as e:
-        return f"Error: {str(e)}"
+        return answer if answer else "NOT_FOUND"
+
+    except:
+        return "NOT_FOUND"
