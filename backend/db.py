@@ -1,113 +1,31 @@
 import sqlite3
 
-# ---------------- CONNECT ----------------
-def connect_db():
-    return sqlite3.connect("database.db")
+def get_connection():
+    return sqlite3.connect("ev_app.db", check_same_thread=False)
 
+def register_user(email, password):
+    conn = get_connection()
+    c = conn.cursor()
 
-# ---------------- CREATE TABLES ----------------
-def create_tables():
-    conn = connect_db()
-    cursor = conn.cursor()
-
-    # Users table
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS users (
-        username TEXT PRIMARY KEY,
-        password TEXT
-    )
-    """)
-
-    # Chat history
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS chats (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        question TEXT,
-        answer TEXT
-    )
-    """)
-
-    conn.commit()
-    conn.close()
-
-
-# ---------------- USER FUNCTIONS ----------------
-def register_user(username, password):
-    try:
-        conn = connect_db()
-        cursor = conn.cursor()
-
-        cursor.execute(
-            "INSERT INTO users (username, password) VALUES (?, ?)",
-            (username, password)
-        )
-
-        conn.commit()
-        conn.close()
-        return True
-    except:
+    c.execute("CREATE TABLE IF NOT EXISTS users (email TEXT, password TEXT)")
+    
+    # Check user exists
+    c.execute("SELECT * FROM users WHERE email=?", (email,))
+    if c.fetchone():
         return False
 
-
-def login_user(username, password):
-    conn = connect_db()
-    cursor = conn.cursor()
-
-    cursor.execute(
-        "SELECT * FROM users WHERE username=? AND password=?",
-        (username, password)
-    )
-
-    user = cursor.fetchone()
-    conn.close()
-
-    return user
-
-
-# ---------------- CHAT FUNCTIONS ----------------
-def save_chat(question, answer):
-    conn = connect_db()
-    cursor = conn.cursor()
-
-    cursor.execute(
-        "INSERT INTO chats (question, answer) VALUES (?, ?)",
-        (question, answer)
-    )
-
+    c.execute("INSERT INTO users VALUES (?, ?)", (email, password))
     conn.commit()
     conn.close()
+    return True
 
 
-def get_chats():
-    conn = connect_db()
-    cursor = conn.cursor()
+def login_user(email, password):
+    conn = get_connection()
+    c = conn.cursor()
 
-    cursor.execute("SELECT question, answer FROM chats")
-    data = cursor.fetchall()
-
-    conn.close()
-    return data
-
-
-# ---------------- CUSTOM KNOWLEDGE ----------------
-def save_knowledge(question, answer):
-    save_chat(question, answer)
-
-
-def search_knowledge(query):
-    conn = connect_db()
-    cursor = conn.cursor()
-
-    cursor.execute(
-        "SELECT answer FROM chats WHERE question LIKE ?",
-        ('%' + query + '%',)
-    )
-
-    result = cursor.fetchone()
+    c.execute("SELECT * FROM users WHERE email=? AND password=?", (email, password))
+    user = c.fetchone()
     conn.close()
 
-    return result[0] if result else None
-
-
-# ---------------- INIT ----------------
-create_tables()
+    return user  # returns None or data

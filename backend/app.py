@@ -1,68 +1,41 @@
 import streamlit as st
 from db import register_user, login_user
 
-# ---------------- PAGE CONFIG ----------------
 st.set_page_config(page_title="EV Assistant", layout="centered")
-
-# ---------------- CLEAN CSS ----------------
-st.markdown("""
-<style>
-
-/* Remove top space */
-.block-container {
-    padding-top: 2rem !important;
-}
-
-/* Hide header/footer */
-header {visibility: hidden;}
-footer {visibility: hidden;}
-
-/* Background */
-.stApp {
-    background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
-}
-
-/* Card */
-.card {
-    background: white;
-    padding: 25px;
-    border-radius: 12px;
-    width: 380px;
-    margin: auto;
-    margin-top: 60px;
-    box-shadow: 0px 4px 15px rgba(0,0,0,0.3);
-}
-
-/* Title */
-.title {
-    text-align: center;
-    font-size: 24px;
-    font-weight: bold;
-    margin-bottom: 15px;
-}
-
-/* Buttons center fix */
-.stButton>button {
-    width: 100%;
-    border-radius: 8px;
-}
-
-/* Input */
-.stTextInput input {
-    border-radius: 8px;
-}
-
-</style>
-""", unsafe_allow_html=True)
 
 # ---------------- SESSION ----------------
 if "page" not in st.session_state:
     st.session_state.page = "login"
 
-# ---------------- CARD ----------------
-st.markdown('<div class="card">', unsafe_allow_html=True)
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
 
-# -------- Toggle Buttons INSIDE CARD --------
+# ---------------- AFTER LOGIN → EV APP ----------------
+if st.session_state.logged_in:
+
+    st.title("⚡ EV Diagnostic Assistant")
+
+    st.success("Welcome! You are logged in ✅")
+
+    query = st.text_input("Ask your EV question:")
+
+    if query:
+        if query.lower() in ["hi", "hello"]:
+            st.write("Hello! 👋")
+        elif query.lower() in ["thanks", "thank you"]:
+            st.write("You're welcome 😊")
+        else:
+            st.write("I don't have information in the manual.")
+
+    if st.button("Logout"):
+        st.session_state.logged_in = False
+        st.session_state.page = "login"
+
+    st.stop()   # 🔥 VERY IMPORTANT (stops login UI)
+
+# ---------------- LOGIN / SIGNUP UI ----------------
+st.markdown("## EV Assistant Login")
+
 col1, col2 = st.columns(2)
 
 with col1:
@@ -73,11 +46,10 @@ with col2:
     if st.button("Signup"):
         st.session_state.page = "signup"
 
-st.write("")
-
 # ---------------- LOGIN ----------------
 if st.session_state.page == "login":
-    st.markdown('<div class="title">Login Form</div>', unsafe_allow_html=True)
+
+    st.subheader("Login Form")
 
     email = st.text_input("Email", key="login_email")
     password = st.text_input("Password", type="password", key="login_pass")
@@ -85,13 +57,16 @@ if st.session_state.page == "login":
     if st.button("Login Now"):
         user = login_user(email, password)
         if user:
-            st.success("Login Successful ✅")
+            st.session_state.logged_in = True   # ✅ KEY FIX
+            st.success("Login successful")
+            st.rerun()  # 🔥 reload app → go to EV page
         else:
-            st.error("Invalid Email or Password ❌")
+            st.error("Invalid credentials")
 
 # ---------------- SIGNUP ----------------
 elif st.session_state.page == "signup":
-    st.markdown('<div class="title">Signup Form</div>', unsafe_allow_html=True)
+
+    st.subheader("Signup Form")
 
     email = st.text_input("Email", key="signup_email")
     password = st.text_input("Password", type="password", key="signup_pass")
@@ -99,16 +74,12 @@ elif st.session_state.page == "signup":
 
     if st.button("Signup Now"):
         if password != confirm:
-            st.error("Passwords do not match ❌")
-        elif len(password) < 6:
-            st.warning("Password must be at least 6 characters")
+            st.error("Passwords do not match")
         else:
             success = register_user(email, password)
             if success:
-                st.success("Account created ✅")
+                st.success("Account created! Please login")
                 st.session_state.page = "login"
+                st.rerun()
             else:
-                st.error("User already exists ❌")
-
-# ---------------- CLOSE CARD ----------------
-st.markdown('</div>', unsafe_allow_html=True)
+                st.error("User already exists")
