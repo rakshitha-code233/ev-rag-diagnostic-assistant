@@ -1,92 +1,141 @@
 import streamlit as st
-import re
-
 from query import get_answer
-from db import register_user, login_user, save_chat, get_chats
+from db import register_user, login_user, save_chat, get_chats, save_knowledge
 
 # ---------------- CONFIG ----------------
 st.set_page_config(page_title="EV Assistant", layout="wide")
-
-# ---------------- PASSWORD VALIDATION ----------------
-def is_valid_password(password):
-    if len(password) < 6:
-        return False
-    if not re.search("[A-Z]", password):
-        return False
-    if not re.search("[0-9]", password):
-        return False
-    return True
 
 # ---------------- SESSION ----------------
 if "user" not in st.session_state:
     st.session_state.user = None
 
-# ---------------- SIDEBAR MENU ----------------
-menu = ["Login", "Sign Up"]
-choice = st.sidebar.selectbox("Menu", menu)
+if "theme" not in st.session_state:
+    st.session_state.theme = "dark"
 
-# ---------------- AUTH ----------------
+if "pending_question" not in st.session_state:
+    st.session_state.pending_question = None
+
+# ---------------- THEME ----------------
+if st.session_state.theme == "dark":
+    st.markdown("""
+        <style>
+        body { background-color: #0E1117; color: white; }
+        </style>
+    """, unsafe_allow_html=True)
+else:
+    st.markdown("""
+        <style>
+        body { background-color: #F7F7F8; color: black; }
+        </style>
+    """, unsafe_allow_html=True)
+
+# ---------------- LOGIN PAGE ----------------
 if st.session_state.user is None:
 
-    if choice == "Sign Up":
-        st.title("📝 Create Account")
+    st.title("🔐 EV Assistant Login")
 
-        username = st.text_input("Username")
-        password = st.text_input("Password", type="password")
+    username = st.text_input("Username")
+    password = st.text_input("Password", type="password")
 
-        if st.button("Sign Up"):
-            if not is_valid_password(password):
-                st.error("Password must be 6+ chars, include 1 uppercase & 1 number")
-            else:
-                success = register_user(username, password)
-                if success:
-                    st.success("Account created! Please login.")
-                else:
-                    st.error("Username already exists")
+    col1, col2 = st.columns(2)
 
-    elif choice == "Login":
-        st.title("🔐 Login")
-
-        username = st.text_input("Username")
-        password = st.text_input("Password", type="password")
-
+    with col1:
         if st.button("Login"):
             user = login_user(username, password)
-
             if user:
                 st.session_state.user = username
-                st.success("Login successful")
                 st.rerun()
             else:
-                st.error("Invalid username or password")
+                st.error("Invalid credentials")
+
+    with col2:
+        if st.button("Sign Up"):
+            success = register_user(username, password)
+            if success:
+                st.success("Account created! Now login")
+            else:
+                st.error("User already exists")
 
 # ---------------- MAIN APP ----------------
-if st.session_state.user:
+else:
 
-    st.sidebar.success(f"👤 {st.session_state.user}")
+    # -------- TOP BAR --------
+    col1, col2, col3, col4 = st.columns([8,1,1,1])
 
-    if st.sidebar.button("Logout"):
-        st.session_state.user = None
-        st.rerun()
+    with col1:
+        st.title("⚡ EV Diagnostic Assistant")
 
-    st.title("⚡ EV Diagnostic Assistant")
+    with col2:
+        if st.button("🌙" if st.session_state.theme=="light" else "☀"):
+            st.session_state.theme = "dark" if st.session_state.theme=="light" else "light"
+            st.rerun()
 
-    query = st.text_input("Ask your EV question:")
+    with col3:
+        st.button("⚙")
+
+    with col4:
+        st.button("🔗")
+
+    # -------- SIDEBAR --------
+    with st.sidebar:
+        st.header("📊 Dashboard")
+
+        if st.button("➕ New Chat"):
+            st.session_state.pending_question = None
+
+        search = st.text_input("🔍 Search chats")
+
+        st.subheader("📜 Chat History")
+        chats = get_chats()
+
+        for q, a in chats[::-1]:
+            if search.lower() in q.lower():
+                st.write("🧑", q[:30])
+
+        st.markdown("---")
+        st.write(f"👤 {st.session_state.user}")
+
+        if st.button("🚪 Logout"):
+            st.session_state.user = None
+            st.rerun()
+
+    # -------- CHAT AREA --------
+    query = st.text_input("Ask your EV question...")
 
     if st.button("Ask"):
         if query:
             answer = get_answer(query)
 
-            st.markdown("### 🤖 Answer")
-            st.write(answer)
+            if answer == "NOT_FOUND":
+                st.warning("I don't have info in manual.\nDo you want to teach me? 👇")
+                st.session_state.pending_question = query
+            else:
+                st.success(answer)
+                save_chat(query, answer)
 
-            save_chat(query, answer)
+    # -------- TEACH SYSTEM --------
+    if st.session_state.pending_question:
+        user_answer = st.text_area("Enter your answer:")
 
-    # ---------------- CHAT HISTORY ----------------
-    st.subheader("📜 Chat History")
+        if st.button("Save Knowledge"):
+            save_knowledge(st.session_state.pending_question, user_answer)
+            st.success("Learned successfully 🎉")
+            st.session_state.pending_question = None
+
+    # -------- CHAT DISPLAY --------
+    st.subheader("💬 Conversation")
 
     chats = get_chats()
+
     for q, a in chats[::-1]:
-        st.write(f"🧑 {q}")
-        st.write(f"🤖 {a}")
-        st.markdown("---")
+        st.markdown(f"""
+        <div style='background:#1E293B;padding:10px;border-radius:10px;margin:5px'>
+        🧑 {q}
+        </div>
+        """, unsafe_allow_html=True)
+
+        st.markdown(f"""
+        <div style='background:#2563EB;padding:10px;border-radius:10px;margin:5px;color:white'>
+        🤖 {a}
+        </div>
+        """, unsafe_allow_html=True)
