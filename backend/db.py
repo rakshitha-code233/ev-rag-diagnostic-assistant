@@ -1,20 +1,29 @@
 import sqlite3
 
-# Connect DB
+# ---------------- CONNECT ----------------
 def connect_db():
-    return sqlite3.connect("chat.db", check_same_thread=False)
+    return sqlite3.connect("database.db")
 
 
-# ---------------- USERS TABLE ----------------
-def create_users_table():
+# ---------------- CREATE TABLES ----------------
+def create_tables():
     conn = connect_db()
     cursor = conn.cursor()
 
+    # Users table
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        username TEXT UNIQUE,
+        username TEXT PRIMARY KEY,
         password TEXT
+    )
+    """)
+
+    # Chat history
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS chats (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        question TEXT,
+        answer TEXT
     )
     """)
 
@@ -22,21 +31,22 @@ def create_users_table():
     conn.close()
 
 
+# ---------------- USER FUNCTIONS ----------------
 def register_user(username, password):
-    conn = connect_db()
-    cursor = conn.cursor()
-
     try:
+        conn = connect_db()
+        cursor = conn.cursor()
+
         cursor.execute(
             "INSERT INTO users (username, password) VALUES (?, ?)",
             (username, password)
         )
+
         conn.commit()
+        conn.close()
         return True
     except:
         return False
-    finally:
-        conn.close()
 
 
 def login_user(username, password):
@@ -50,26 +60,11 @@ def login_user(username, password):
 
     user = cursor.fetchone()
     conn.close()
+
     return user
 
 
-# ---------------- CHAT TABLE ----------------
-def create_chat_table():
-    conn = connect_db()
-    cursor = conn.cursor()
-
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS chats (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        question TEXT,
-        answer TEXT
-    )
-    """)
-
-    conn.commit()
-    conn.close()
-
-
+# ---------------- CHAT FUNCTIONS ----------------
 def save_chat(question, answer):
     conn = connect_db()
     cursor = conn.cursor()
@@ -94,6 +89,25 @@ def get_chats():
     return data
 
 
-# Initialize tables
-create_users_table()
-create_chat_table()
+# ---------------- CUSTOM KNOWLEDGE ----------------
+def save_knowledge(question, answer):
+    save_chat(question, answer)
+
+
+def search_knowledge(query):
+    conn = connect_db()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        "SELECT answer FROM chats WHERE question LIKE ?",
+        ('%' + query + '%',)
+    )
+
+    result = cursor.fetchone()
+    conn.close()
+
+    return result[0] if result else None
+
+
+# ---------------- INIT ----------------
+create_tables()
