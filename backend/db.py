@@ -4,8 +4,8 @@ import sqlite3
 def get_connection():
     return sqlite3.connect("ev_app.db", check_same_thread=False)
 
-# ---------- CREATE TABLE ----------
-def create_table():
+# ---------- USER TABLE ----------
+def create_user_table():
     conn = get_connection()
     c = conn.cursor()
 
@@ -21,13 +21,13 @@ def create_table():
 
 # ---------- SIGNUP ----------
 def register_user(email, password):
-    create_table()   # 🔥 IMPORTANT
+    create_user_table()
 
     conn = get_connection()
     c = conn.cursor()
 
     try:
-        c.execute("INSERT INTO users (email, password) VALUES (?, ?)", (email, password))
+        c.execute("INSERT INTO users VALUES (?, ?)", (email, password))
         conn.commit()
         return True
     except:
@@ -37,7 +37,7 @@ def register_user(email, password):
 
 # ---------- LOGIN ----------
 def login_user(email, password):
-    create_table()   # 🔥 IMPORTANT
+    create_user_table()
 
     conn = get_connection()
     c = conn.cursor()
@@ -46,5 +46,41 @@ def login_user(email, password):
     user = c.fetchone()
 
     conn.close()
-
     return user
+
+# ---------- KNOWLEDGE ----------
+def create_knowledge_table():
+    conn = get_connection()
+    c = conn.cursor()
+
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS knowledge (
+            question TEXT PRIMARY KEY,
+            answer TEXT
+        )
+    """)
+
+    conn.commit()
+    conn.close()
+
+def save_knowledge(question, answer):
+    create_knowledge_table()
+
+    conn = get_connection()
+    c = conn.cursor()
+
+    c.execute("INSERT OR REPLACE INTO knowledge VALUES (?, ?)", (question.lower(), answer))
+    conn.commit()
+    conn.close()
+
+def get_knowledge(question):
+    create_knowledge_table()
+
+    conn = get_connection()
+    c = conn.cursor()
+
+    c.execute("SELECT answer FROM knowledge WHERE question=?", (question.lower(),))
+    data = c.fetchone()
+
+    conn.close()
+    return data[0] if data else None
