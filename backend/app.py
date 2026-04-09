@@ -18,6 +18,9 @@ if "current_chat" not in st.session_state:
 if "last_question" not in st.session_state:
     st.session_state.last_question = ""
 
+if "show_profile" not in st.session_state:
+    st.session_state.show_profile = False
+
 # ---------------- CSS ----------------
 st.markdown("""
 <style>
@@ -26,6 +29,13 @@ html, body {
     color: white;
 }
 
+/* Inputs */
+.stTextInput input, .stChatInput input {
+    color: white !important;
+    background-color: #1e293b !important;
+}
+
+/* Chat bubbles */
 .user-msg {
     background-color: #1e293b;
     padding: 10px;
@@ -42,15 +52,16 @@ html, body {
     text-align: left;
 }
 
-.stTextInput input, .stChatInput input {
-    color: white !important;
-    background-color: #1e293b !important;
+/* Buttons */
+.stButton>button {
+    background-color: #2563eb;
+    color: white;
+    border-radius: 8px;
 }
-
 </style>
 """, unsafe_allow_html=True)
 
-# ---------------- LOGIN ----------------
+# ---------------- LOGIN PAGE ----------------
 if not st.session_state.logged_in:
 
     st.title("🚗 EV Diagnostic Assistant")
@@ -66,9 +77,10 @@ if not st.session_state.logged_in:
             user = login_user(email, password)
             if user:
                 st.session_state.logged_in = True
+                st.session_state.user_email = email  # SAVE USER
                 st.rerun()
             else:
-                st.error("Invalid credentials")
+                st.error("Invalid credentials ❌")
 
     with tab2:
         st.subheader("Sign Up Form")
@@ -77,7 +89,7 @@ if not st.session_state.logged_in:
 
         if st.button("Sign Up"):
             register_user(new_email, new_password)
-            st.success("Account created")
+            st.success("Account created ✅")
 
 # ---------------- MAIN APP ----------------
 else:
@@ -85,48 +97,74 @@ else:
     # -------- SIDEBAR --------
     with st.sidebar:
 
-        # LOGO + PROFILE
-        st.markdown("## 🚗 EV Assistant")
-        if st.button("👤 Profile"):
-            st.info("User Profile (you can expand later)")
+        # LOGO + CLICK
+        if st.button("🚗 EV Assistant"):
+            st.session_state.show_profile = True
+
+        st.image("logo.png", width=150)
 
         st.markdown("---")
 
         # NEW CHAT
         if st.button("➕ New Chat"):
-            new_chat_name = f"Chat {len(st.session_state.chats) + 1}"
-            st.session_state.chats[new_chat_name] = []
-            st.session_state.current_chat = new_chat_name
+            new_chat = f"Chat {len(st.session_state.chats) + 1}"
+            st.session_state.chats[new_chat] = []
+            st.session_state.current_chat = new_chat
 
         st.markdown("### 💬 Chats")
 
-        # SHOW CHAT LIST
-        for chat_name in list(st.session_state.chats.keys()):
+        # CHAT LIST + RENAME
+        for chat in list(st.session_state.chats.keys()):
 
             col1, col2 = st.columns([3,1])
 
             with col1:
-                if st.button(chat_name):
-                    st.session_state.current_chat = chat_name
+                if st.button(chat):
+                    st.session_state.current_chat = chat
 
             with col2:
-                if st.button("✏️", key=chat_name):
-                    new_name = st.text_input("Rename:", key=f"rename_{chat_name}")
+                if st.button("✏️", key=chat):
+                    new_name = st.text_input("Rename:", key=f"rename_{chat}")
                     if new_name:
-                        st.session_state.chats[new_name] = st.session_state.chats.pop(chat_name)
+                        st.session_state.chats[new_name] = st.session_state.chats.pop(chat)
                         st.session_state.current_chat = new_name
                         st.rerun()
 
         st.markdown("---")
 
+        # LOGOUT
         if st.button("Logout"):
             st.session_state.logged_in = False
+            st.session_state.chats = {"Chat 1": []}
+            st.session_state.current_chat = "Chat 1"
             st.rerun()
 
-    # -------- HEADER --------
+    # -------- PROFILE PAGE --------
+    if st.session_state.show_profile:
+
+        st.title("👤 User Profile")
+
+        st.markdown(f"""
+        ### 📧 Email:
+        {st.session_state.get("user_email")}
+
+        ### 🚗 App:
+        EV Diagnostic Assistant
+
+        ### 💬 Total Chats:
+        {len(st.session_state.chats)}
+        """)
+
+        if st.button("⬅ Back to Chat"):
+            st.session_state.show_profile = False
+            st.rerun()
+
+        st.stop()
+
+    # -------- MAIN HEADER --------
     st.title("🚗 EV Diagnostic Assistant")
 
-    # -------- DISPLAY CURRENT CHAT --------
+    # -------- CHAT DISPLAY --------
     current_chat = st.session_state.current_chat
     messages = st.session_state.chats[current_chat]
 
