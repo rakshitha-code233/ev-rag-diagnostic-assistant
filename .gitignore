@@ -3,3 +3,16 @@ __pycache__/
 *.pyc
 .env
 vectorstore/
+# Ignore database files
+*.sqlite3
+*.db
+
+# Ignore vector DB
+backend/database/
+
+# Ignore embeddings
+*.index
+
+# Ignore env
+venv/
+.env
