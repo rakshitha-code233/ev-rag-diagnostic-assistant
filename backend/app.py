@@ -9,8 +9,11 @@ st.set_page_config(page_title="EV Assistant", layout="wide")
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 
-if "messages" not in st.session_state:
-    st.session_state.messages = []
+if "chats" not in st.session_state:
+    st.session_state.chats = {"Chat 1": []}
+
+if "current_chat" not in st.session_state:
+    st.session_state.current_chat = "Chat 1"
 
 if "last_question" not in st.session_state:
     st.session_state.last_question = ""
@@ -18,16 +21,14 @@ if "last_question" not in st.session_state:
 # ---------------- CSS ----------------
 st.markdown("""
 <style>
-/* Background */
-body {
+html, body {
     background-color: #0f172a;
     color: white;
 }
 
-/* Chat bubbles */
 .user-msg {
     background-color: #1e293b;
-    padding: 12px;
+    padding: 10px;
     border-radius: 10px;
     margin: 5px;
     text-align: right;
@@ -35,28 +36,29 @@ body {
 
 .bot-msg {
     background-color: #020617;
-    padding: 12px;
+    padding: 10px;
     border-radius: 10px;
     margin: 5px;
     text-align: left;
 }
 
-/* Sidebar */
-.sidebar .sidebar-content {
-    background-color: #020617;
+.stTextInput input, .stChatInput input {
+    color: white !important;
+    background-color: #1e293b !important;
 }
+
 </style>
 """, unsafe_allow_html=True)
 
-# ---------------- LOGIN PAGE ----------------
+# ---------------- LOGIN ----------------
 if not st.session_state.logged_in:
 
     st.title("🚗 EV Diagnostic Assistant")
 
-    col1, col2 = st.columns(2)
+    tab1, tab2 = st.tabs(["Login", "Sign Up"])
 
-    with col1:
-        st.subheader("Login")
+    with tab1:
+        st.subheader("Login Form")
         email = st.text_input("Email")
         password = st.text_input("Password", type="password")
 
@@ -64,51 +66,71 @@ if not st.session_state.logged_in:
             user = login_user(email, password)
             if user:
                 st.session_state.logged_in = True
-                st.success("Login successful ✅")
                 st.rerun()
             else:
-                st.error("Invalid credentials ❌")
+                st.error("Invalid credentials")
 
-    with col2:
-        st.subheader("Sign Up")
+    with tab2:
+        st.subheader("Sign Up Form")
         new_email = st.text_input("New Email")
         new_password = st.text_input("New Password", type="password")
 
         if st.button("Sign Up"):
             register_user(new_email, new_password)
-            st.success("Account created ✅")
+            st.success("Account created")
 
 # ---------------- MAIN APP ----------------
 else:
 
     # -------- SIDEBAR --------
     with st.sidebar:
-        st.title("📊 Dashboard")
 
-        if st.button("➕ New Chat"):
-            st.session_state.messages = []
-
-        st.markdown("### 📜 History")
-
-        for msg in st.session_state.messages[-10:]:
-            if msg["role"] == "user":
-                st.write("🧑 " + msg["content"][:30])
+        # LOGO + PROFILE
+        st.markdown("## 🚗 EV Assistant")
+        if st.button("👤 Profile"):
+            st.info("User Profile (you can expand later)")
 
         st.markdown("---")
 
-        st.write("👤 Profile")
-        st.write("User logged in")
+        # NEW CHAT
+        if st.button("➕ New Chat"):
+            new_chat_name = f"Chat {len(st.session_state.chats) + 1}"
+            st.session_state.chats[new_chat_name] = []
+            st.session_state.current_chat = new_chat_name
+
+        st.markdown("### 💬 Chats")
+
+        # SHOW CHAT LIST
+        for chat_name in list(st.session_state.chats.keys()):
+
+            col1, col2 = st.columns([3,1])
+
+            with col1:
+                if st.button(chat_name):
+                    st.session_state.current_chat = chat_name
+
+            with col2:
+                if st.button("✏️", key=chat_name):
+                    new_name = st.text_input("Rename:", key=f"rename_{chat_name}")
+                    if new_name:
+                        st.session_state.chats[new_name] = st.session_state.chats.pop(chat_name)
+                        st.session_state.current_chat = new_name
+                        st.rerun()
+
+        st.markdown("---")
 
         if st.button("Logout"):
             st.session_state.logged_in = False
-            st.session_state.messages = []
             st.rerun()
 
     # -------- HEADER --------
     st.title("🚗 EV Diagnostic Assistant")
 
-    # -------- CHAT DISPLAY --------
-    for msg in st.session_state.messages:
+    # -------- DISPLAY CURRENT CHAT --------
+    current_chat = st.session_state.current_chat
+    messages = st.session_state.chats[current_chat]
+
+    for msg in messages:
         if msg["role"] == "user":
             st.markdown(f'<div class="user-msg">🧑 {msg["content"]}</div>', unsafe_allow_html=True)
         else:
@@ -119,17 +141,15 @@ else:
 
     if user_input:
 
-        # Show user message
-        st.session_state.messages.append({"role": "user", "content": user_input})
+        messages.append({"role": "user", "content": user_input})
 
-        # Handle YES logic
         if user_input.lower() == "yes":
             response = get_answer(st.session_state.last_question, use_ai=True)
         else:
             st.session_state.last_question = user_input
             response = get_answer(user_input)
 
-        # Save bot response
-        st.session_state.messages.append({"role": "bot", "content": response})
+        messages.append({"role": "bot", "content": response})
 
+        st.session_state.chats[current_chat] = messages
         st.rerun()
