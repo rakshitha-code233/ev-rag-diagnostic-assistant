@@ -3,6 +3,9 @@ from groq import Groq
 from sentence_transformers import SentenceTransformer
 import faiss
 import numpy as np
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # ------------------ LOAD API ------------------
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
