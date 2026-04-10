@@ -1,134 +1,193 @@
 import streamlit as st
-from db import register_user, login_user, get_knowledge, save_knowledge
-from query import ask_ai
+from db import register_user, login_user
+from query import get_answer
 
+# ---------------- CONFIG ----------------
 st.set_page_config(page_title="EV Assistant", layout="wide")
 
-# ---------- SESSION ----------
+# ---------------- SESSION ----------------
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 
-if "page" not in st.session_state:
-    st.session_state.page = "login"
+if "chats" not in st.session_state:
+    st.session_state.chats = {"Chat 1": []}
 
-if "messages" not in st.session_state:
-    st.session_state.messages = []
+if "current_chat" not in st.session_state:
+    st.session_state.current_chat = "Chat 1"
 
-# ---------- LOGIN SYSTEM ----------
+if "last_question" not in st.session_state:
+    st.session_state.last_question = ""
+
+if "show_profile" not in st.session_state:
+    st.session_state.show_profile = False
+
+# ---------------- CSS ----------------
+st.markdown("""
+<style>
+html, body {
+    background-color: #0f172a;
+    color: white;
+}
+
+/* Inputs */
+.stTextInput input, .stChatInput input {
+    color: white !important;
+    background-color: #1e293b !important;
+}
+
+/* Chat bubbles */
+.user-msg {
+    background-color: #1e293b;
+    padding: 10px;
+    border-radius: 10px;
+    margin: 5px;
+    text-align: right;
+}
+
+.bot-msg {
+    background-color: #020617;
+    padding: 10px;
+    border-radius: 10px;
+    margin: 5px;
+    text-align: left;
+}
+
+/* Buttons */
+.stButton>button {
+    background-color: #2563eb;
+    color: white;
+    border-radius: 8px;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# ---------------- LOGIN PAGE ----------------
 if not st.session_state.logged_in:
 
-    st.title("🔐 EV Assistant Login System")
+    st.title("🚗 EV Diagnostic Assistant")
 
-    col1, col2 = st.columns(2)
+    tab1, tab2 = st.tabs(["Login", "Sign Up"])
 
-    with col1:
-        if st.button("Login"):
-            st.session_state.page = "login"
-
-    with col2:
-        if st.button("Signup"):
-            st.session_state.page = "signup"
-
-    # -------- LOGIN --------
-    if st.session_state.page == "login":
+    with tab1:
         st.subheader("Login Form")
+        email = st.text_input("Email")
+        password = st.text_input("Password", type="password")
 
-        email = st.text_input("Email", key="login_email")
-        password = st.text_input("Password", type="password", key="login_pass")
-
-        if st.button("Login Now"):
+        if st.button("Login"):
             user = login_user(email, password)
             if user:
                 st.session_state.logged_in = True
-                st.success("Login successful ✅")
+                st.session_state.user_email = email  # SAVE USER
                 st.rerun()
             else:
                 st.error("Invalid credentials ❌")
 
-    # -------- SIGNUP --------
-    elif st.session_state.page == "signup":
-        st.subheader("Signup Form")
+    with tab2:
+        st.subheader("Sign Up Form")
+        new_email = st.text_input("New Email")
+        new_password = st.text_input("New Password", type="password")
 
-        email = st.text_input("Email", key="signup_email")
-        password = st.text_input("Password", type="password", key="signup_pass")
-        confirm = st.text_input("Confirm Password")
+        if st.button("Sign Up"):
+            register_user(new_email, new_password)
+            st.success("Account created ✅")
 
-        if st.button("Signup Now"):
-            if password != confirm:
-                st.error("Passwords do not match ❌")
-            else:
-                success = register_user(email, password)
-                if success:
-                    st.success("Account created ✅ Please login")
-                    st.session_state.page = "login"
-                    st.rerun()
-                else:
-                    st.error("User already exists ❌")
+# ---------------- MAIN APP ----------------
+else:
 
-    st.stop()
+    # -------- SIDEBAR --------
+    with st.sidebar:
 
-# ---------- MAIN EV CHAT ----------
-st.title("⚡ EV Diagnostic Assistant")
+        # LOGO + CLICK
+        if st.button("🚗 EV Assistant"):
+            st.session_state.show_profile = True
 
-# -------- CHAT HISTORY --------
-for msg in st.session_state.messages:
-    with st.chat_message(msg["role"]):
-        st.write(msg["content"])
+        st.image("logo.png", width=150)
 
-# -------- INPUT --------
-query = st.chat_input("Ask your EV question...")
+        st.markdown("---")
 
-if query:
+        # NEW CHAT
+        if st.button("➕ New Chat"):
+            new_chat = f"Chat {len(st.session_state.chats) + 1}"
+            st.session_state.chats[new_chat] = []
+            st.session_state.current_chat = new_chat
 
-    st.session_state.messages.append({"role": "user", "content": query})
-    with st.chat_message("user"):
-        st.write(query)
+        st.markdown("### 💬 Chats")
 
-    # -------- GREETINGS --------
-    if query.lower() in ["hi", "hello"]:
-        answer = "Hello! 👋 Ask me about EV diagnostics."
+        # CHAT LIST + RENAME
+        for chat in list(st.session_state.chats.keys()):
 
-    elif query.lower() in ["thanks", "thank you"]:
-        answer = "You're welcome 😊"
+            col1, col2 = st.columns([3,1])
 
-    else:
-        stored = get_knowledge(query)
+            with col1:
+                if st.button(chat):
+                    st.session_state.current_chat = chat
 
-        if stored:
-            answer = f"📘 From manual:\n{stored}"
+            with col2:
+                if st.button("✏️", key=chat):
+                    new_name = st.text_input("Rename:", key=f"rename_{chat}")
+                    if new_name:
+                        st.session_state.chats[new_name] = st.session_state.chats.pop(chat)
+                        st.session_state.current_chat = new_name
+                        st.rerun()
+
+        st.markdown("---")
+
+        # LOGOUT
+        if st.button("Logout"):
+            st.session_state.logged_in = False
+            st.session_state.chats = {"Chat 1": []}
+            st.session_state.current_chat = "Chat 1"
+            st.rerun()
+
+    # -------- PROFILE PAGE --------
+    if st.session_state.show_profile:
+
+        st.title("👤 User Profile")
+
+        st.markdown(f"""
+        ### 📧 Email:
+        {st.session_state.get("user_email")}
+
+        ### 🚗 App:
+        EV Diagnostic Assistant
+
+        ### 💬 Total Chats:
+        {len(st.session_state.chats)}
+        """)
+
+        if st.button("⬅ Back to Chat"):
+            st.session_state.show_profile = False
+            st.rerun()
+
+        st.stop()
+
+    # -------- MAIN HEADER --------
+    st.title("🚗 EV Diagnostic Assistant")
+
+    # -------- CHAT DISPLAY --------
+    current_chat = st.session_state.current_chat
+    messages = st.session_state.chats[current_chat]
+
+    for msg in messages:
+        if msg["role"] == "user":
+            st.markdown(f'<div class="user-msg">🧑 {msg["content"]}</div>', unsafe_allow_html=True)
         else:
-            answer = "❌ Not found in manual.\n\nDo you want AI answer?"
+            st.markdown(f'<div class="bot-msg">🤖 {msg["content"]}</div>', unsafe_allow_html=True)
 
-    st.session_state.messages.append({"role": "assistant", "content": answer})
-    with st.chat_message("assistant"):
-        st.write(answer)
+    # -------- INPUT --------
+    user_input = st.chat_input("Ask your EV question...")
 
-    # -------- AI OPTION --------
-    if "Not found" in answer:
+    if user_input:
 
-        col1, col2 = st.columns(2)
+        messages.append({"role": "user", "content": user_input})
 
-        with col1:
-            if st.button("Yes (Use AI)"):
-                ai_answer = ask_ai(query)
+        if user_input.lower() == "yes":
+            response = get_answer(st.session_state.last_question, use_ai=True)
+        else:
+            st.session_state.last_question = user_input
+            response = get_answer(user_input)
 
-                st.session_state.messages.append({
-                    "role": "assistant",
-                    "content": ai_answer
-                })
+        messages.append({"role": "bot", "content": response})
 
-                with st.chat_message("assistant"):
-                    st.write(ai_answer)
-
-                if st.button("Save this answer"):
-                    save_knowledge(query, ai_answer)
-                    st.success("Saved ✅")
-
-        with col2:
-            if st.button("No"):
-                st.info("Okay 👍")
-
-# -------- LOGOUT --------
-if st.sidebar.button("Logout"):
-    st.session_state.logged_in = False
-    st.rerun()
+        st.session_state.chats[current_chat] = messages
+        st.rerun()
