@@ -20,7 +20,9 @@ else:
     index = None
 
 # ------------------ LOAD DOCUMENTS ------------------
-with open("documents.txt", "r", encoding="utf-8") as f:
+file_path = os.path.join(os.path.dirname(__file__), "documents.txt")
+
+with open(file_path, "r", encoding="utf-8") as f:
     documents = f.readlines()
 
 # ------------------ GREETINGS ------------------
