@@ -101,6 +101,7 @@ else:
         if st.button("🚗 EV Assistant"):
             st.session_state.show_profile = True
 
+        logo_path = os.path.join(os.path.dirname(__file__), "logo.png")
         st.image("logo.png", width=150)
 
         st.markdown("---")
