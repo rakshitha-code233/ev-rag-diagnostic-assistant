@@ -97,8 +97,12 @@ def get_answer(query, use_ai=False):
         return f"📘 From Manual:\n\n{manual}"
 
     # 4. Ask for AI
-    if not use_ai:
-        return "❌ Not found in manual.\n\nDo you want AI answer? (type: yes)"
+    def get_answer(user_query):
+        manual_answer = search_manual(user_query)
 
+        if manual_answer:
+            return manual_answer
+        else:
+            return "I couldn’t find this in the manual, but here’s an AI-based answer:\n\n" + get_ai_answer(user_query)
     # 5. AI answer
     return get_ai_answer(query)
