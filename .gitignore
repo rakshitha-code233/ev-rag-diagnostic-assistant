@@ -16,3 +16,11 @@ backend/database/
 # Ignore env
 venv/
 .env
+
+# Database files
+*.sqlite3
+*.db
+
+# Chroma DB
+chroma/
+database/
