@@ -1,6 +1,7 @@
 import streamlit as st
 from db import register_user, login_user
 from query import get_answer
+import os
 
 # ---------------- CONFIG ----------------
 st.set_page_config(page_title="EV Assistant", layout="wide")
