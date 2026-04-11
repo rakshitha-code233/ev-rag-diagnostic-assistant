@@ -53,3 +53,4 @@ if user_input:
         st.markdown(response)
 
     st.session_state.messages.append({"role": "assistant", "content": response})
+    print("Hello from teammate")
