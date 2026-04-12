@@ -106,3 +106,4 @@ def get_answer(query, use_ai=False):
             return "I couldn’t find this in the manual, but here’s an AI-based answer:\n\n" + get_ai_answer(user_query)
     # 5. AI answer
     return get_ai_answer(query)
+    print("Manual Answer:", manual_answer)
