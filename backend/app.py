@@ -1,56 +1,272 @@
 import streamlit as st
 from db import register_user, login_user
 from query import get_answer
-import os
+from datetime import datetime
 
-# ------------------ PAGE CONFIG ------------------
-st.set_page_config(page_title="EV Diagnostic Assistant", page_icon="🚗")
+# ---------------- PAGE CONFIG ----------------
+st.set_page_config(page_title="EV Assistant", layout="wide")
 
-# ------------------ LOAD LOGO SAFELY ------------------
-current_dir = os.path.dirname(__file__)
-logo_path = os.path.join(current_dir, "logo.png")
+# ---------------- CSS (UPDATED ONLY THIS) ----------------
+st.markdown("""
+<style>
 
-if os.path.exists(logo_path):
-    st.image(logo_path, width=150)
-else:
-    st.warning("Logo not found")
+/* Background */
+.stApp {
+    background: linear-gradient(135deg, #0b1f4a, #132f6b, #1f4ed8);
+    color: white;
+}
 
-# ------------------ TITLE ------------------
-st.title("🚗 EV Diagnostic Assistant")
+/* Sidebar */
+section[data-testid="stSidebar"] {
+    background: #081a3a !important;
+}
 
-# ------------------ SESSION STATE (CHAT HISTORY) ------------------
+/* Sidebar buttons */
+section[data-testid="stSidebar"] button {
+    background: transparent;
+    color: white;
+    border-radius: 8px;
+    padding: 6px;
+}
+section[data-testid="stSidebar"] button:hover {
+    background: rgba(255,255,255,0.1);
+}
+
+/* ✅ NORMAL SMALL GLOW BUTTONS */
+div.stButton > button {
+    height: 40px;
+    font-size: 14px;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.08);
+    color: white;
+    border: none;
+    box-shadow: 0 0 8px rgba(0,200,255,0.3);
+    transition: 0.2s;
+}
+
+div.stButton > button:hover {
+    box-shadow: 0 0 15px rgba(0,255,255,0.6);
+    transform: scale(1.03);
+}
+
+/* Title */
+.title {
+    font-size: 40px;
+    font-weight: bold;
+}
+.blue {
+    color: #60a5fa;
+}
+
+/* Hide top bar */
+header {visibility: hidden;}
+
+</style>
+""", unsafe_allow_html=True)
+
+# ---------------- SESSION ----------------
+if "page" not in st.session_state:
+    st.session_state.page = "login"
+
+if "user" not in st.session_state:
+    st.session_state.user = None
+
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# ------------------ PDF UPLOAD ------------------
-st.sidebar.header("📄 Upload EV Manual (PDF)")
-uploaded_file = st.sidebar.file_uploader("Upload PDF", type=["pdf"])
+if "history" not in st.session_state:
+    st.session_state.history = []
 
-if uploaded_file is not None:
-    with open("temp.pdf", "wb") as f:
-        f.write(uploaded_file.read())
-    st.sidebar.success("PDF uploaded successfully!")
+# ---------------- LOGIN ----------------
+if st.session_state.page == "login":
 
-# ------------------ DISPLAY CHAT HISTORY ------------------
-for msg in st.session_state.messages:
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
+    st.title("Login")
 
-# ------------------ USER INPUT ------------------
-user_input = st.chat_input("Ask your EV question...")
+    email = st.text_input("Email")
+    password = st.text_input("Password", type="password")
 
-if user_input:
-    # Show user message
-    st.session_state.messages.append({"role": "user", "content": user_input})
-    with st.chat_message("user"):
-        st.markdown(user_input)
+    if st.button("Login"):
+        user = login_user(email, password)
 
-    # Get response (AUTO manual + AI fallback)
-    response = get_answer(user_input)
+        if user:
+            st.session_state.user = {
+                "username": user[1],
+                "email": user[2]
+            }
+            st.session_state.page = "dashboard"
+            st.rerun()
+        else:
+            st.error("Invalid credentials")
 
-    # Show bot response
-    with st.chat_message("assistant"):
-        st.markdown(response)
+    if st.button("Create Account"):
+        st.session_state.page = "signup"
+        st.rerun()
+
+# ---------------- SIGNUP ----------------
+elif st.session_state.page == "signup":
+
+    st.title("Create Account")
+
+    username = st.text_input("Username")
+    email = st.text_input("Email")
+    password = st.text_input("Password", type="password")
+    confirm = st.text_input("Confirm Password", type="password")
+
+    if st.button("Register"):
+
+        if password != confirm:
+            st.error("Passwords do not match")
+
+        elif len(password) < 6:
+            st.error("Password must be at least 6 characters")
+
+        else:
+            result = register_user(username, email, password)
+
+            if result == "success":
+                st.success("Account created")
+                st.session_state.page = "login"
+                st.rerun()
+            else:
+                st.error("Email already exists")
+
+    if st.button("⬅ Back"):
+        st.session_state.page = "login"
+        st.rerun()
+
+# ---------------- MAIN APP ----------------
+else:
+
+    # -------- SIDEBAR --------
+    with st.sidebar:
+
+        st.markdown("## ⚡ EV Assistant")
+
+        if st.button("🏠 Dashboard"):
+            st.session_state.page = "dashboard"
+
+        if st.button("🤖 EV Assistant"):
+            st.session_state.page = "chat"
+
+        if st.button("🕘 Chat History"):
+            st.session_state.page = "history"
+
+        if st.button("📄 Upload Manuals"):
+            st.session_state.page = "upload"
+
+        st.markdown("<br><br><br><br>", unsafe_allow_html=True)
+
+        if st.button("🚪 Logout"):
+            st.session_state.clear()
+            st.session_state.page = "login"
+            st.rerun()
+
+    # -------- PROFILE ICON --------
+    col1, col2 = st.columns([10,1])
+    with col2:
+        if st.button("👤"):
+            st.session_state.page = "profile"
+            st.rerun()
+
+    # ---------------- PROFILE ----------------
+    if st.session_state.page == "profile":
+
+        if st.button("⬅"):
+            st.session_state.page = "dashboard"
+            st.rerun()
+
+        st.title("My Profile")
+
+        st.write("👤 Username:", st.session_state.user.get("username"))
+        st.write("📧 Email:", st.session_state.user.get("email"))
+
+    # ---------------- DASHBOARD (UPDATED ONLY THIS) ----------------
+    elif st.session_state.page == "dashboard":
+
+        st.markdown("<div class='title'>Welcome to</div>", unsafe_allow_html=True)
+        st.markdown("<div class='title blue'>EV Diagnostic Assistant</div>", unsafe_allow_html=True)
+
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+            if st.button("🤖 EV Assistant", use_container_width=True):
+                st.session_state.page = "chat"
+                st.rerun()
+
+        with col2:
+            if st.button("📂 Upload Manuals", use_container_width=True):
+                st.session_state.page = "upload"
+                st.rerun()
+
+        with col3:
+            if st.button("📜 Chat History", use_container_width=True):
+                st.session_state.page = "history"
+                st.rerun()
+
+    # ---------------- CHAT ----------------
+    elif st.session_state.page == "chat":
+
+        if st.button("⬅"):
+            st.session_state.page = "dashboard"
+            st.rerun()
+
+        st.header("EV Assistant")
+
+        for msg in st.session_state.messages:
+            with st.chat_message(msg["role"]):
+                st.markdown(msg["content"])
+
+        user_input = st.chat_input("Ask EV question...")
+
+        if user_input:
+            st.session_state.messages.append({"role": "user", "content": user_input})
+
+            response = get_answer(user_input)
+
+            st.session_state.messages.append({"role": "assistant", "content": response})
+
+            st.session_state.history.append({
+                "time": datetime.now().strftime("%I:%M %p"),
+                "question": user_input,
+                "chat": st.session_state.messages.copy()
+            })
+
+            st.rerun()
+
+    # ---------------- HISTORY ----------------
+    elif st.session_state.page == "history":
+
+        if st.button("⬅"):
+            st.session_state.page = "dashboard"
+            st.rerun()
+
+        st.header("Chat History")
+
+        for i, item in enumerate(st.session_state.history):
+            if st.button(f"{item['time']} - {item['question']}", key=i):
+                st.session_state.messages = item["chat"]
+                st.session_state.page = "chat"
+                st.rerun()
+
+    # ---------------- UPLOAD ----------------
+    elif st.session_state.page == "upload":
+
+        if st.button("⬅"):
+            st.session_state.page = "dashboard"
+            st.rerun()
+
+        st.header("Upload Manuals")
+
+        file = st.file_uploader("Upload PDF", type=["pdf"])
+
+        if file:
+            with open("temp.pdf", "wb") as f:
+                f.write(file.read())
+                app-dev
+            st.success("Uploaded successfully")
 
     st.session_state.messages.append({"role": "assistant", "content": response})
     print("Hello from teammate")
+    main
