@@ -264,5 +264,9 @@ else:
         if file:
             with open("temp.pdf", "wb") as f:
                 f.write(file.read())
-
+                app-dev
             st.success("Uploaded successfully")
+
+    st.session_state.messages.append({"role": "assistant", "content": response})
+    print("Hello from teammate")
+    main
