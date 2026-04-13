@@ -268,6 +268,3 @@ else:
                 f.write(file.read())
     
             st.success("Uploaded successfully")
-
-    st.session_state.messages.append({"role": "assistant", "content": response})
-    print("Hello from teammate")
