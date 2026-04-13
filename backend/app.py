@@ -222,8 +222,10 @@ else:
 
         if user_input:
             st.session_state.messages.append({"role": "user", "content": user_input})
-
-            response = get_answer(user_input)
+            try:
+                response = get_answer(user_input)
+            except Exception as e:
+                response = f"Error: {str(e)}"
 
             st.session_state.messages.append({"role": "assistant", "content": response})
 
@@ -264,9 +266,8 @@ else:
         if file:
             with open("temp.pdf", "wb") as f:
                 f.write(file.read())
-                app-dev
+    
             st.success("Uploaded successfully")
 
     st.session_state.messages.append({"role": "assistant", "content": response})
     print("Hello from teammate")
-    main
