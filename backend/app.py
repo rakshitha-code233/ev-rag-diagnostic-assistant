@@ -1,10 +1,13 @@
 import streamlit as st
-from db import register_user, login_user
+from db import register_user, login_user,create_table
 from query import get_answer
 from datetime import datetime
 
 # ---------------- PAGE CONFIG ----------------
 st.set_page_config(page_title="EV Assistant", layout="wide")
+
+# ---------------- CREATE TABLE ----------------
+create_table()
 
 # ---------------- CSS (UPDATED ONLY THIS) ----------------
 st.markdown("""
@@ -137,30 +140,34 @@ elif st.session_state.page == "signup":
 # ---------------- MAIN APP ----------------
 else:
 
-    # -------- SIDEBAR --------
+    # -------- SIDEBAR TOGGLE --------
+    st.set_page_config (
+        page_title="EV Assistant",layout="wide",
+        initial_sidebar_state="expanded"  # ✅ always visible
+    )
     with st.sidebar:
 
-        st.markdown("## ⚡ EV Assistant")
+            st.markdown("## ⚡ EV Assistant")
 
-        if st.button("🏠 Dashboard"):
-            st.session_state.page = "dashboard"
+            if st.button("🏠 Dashboard"):
+                st.session_state.page = "dashboard"
 
-        if st.button("🤖 EV Assistant"):
-            st.session_state.page = "chat"
+            if st.button("🤖 EV Assistant"):
+                st.session_state.page = "chat"
 
-        if st.button("🕘 Chat History"):
-            st.session_state.page = "history"
+            if st.button("🕘 Chat History"):
+                st.session_state.page = "history"
 
-        if st.button("📄 Upload Manuals"):
-            st.session_state.page = "upload"
+            if st.button("📄 Upload Manuals"):
+                st.session_state.page = "upload"
 
-        st.markdown("<br><br><br><br>", unsafe_allow_html=True)
+            st.markdown("<br><br><br><br>", unsafe_allow_html=True)
 
-        if st.button("🚪 Logout"):
-            st.session_state.clear()
-            st.session_state.page = "login"
-            st.rerun()
-
+        # Logout at bottom
+            if st.button("🚪 Logout"):
+                st.session_state.clear()
+                st.session_state.page = "login"
+                st.rerun()
     # -------- PROFILE ICON --------
     col1, col2 = st.columns([10,1])
     with col2:
@@ -176,7 +183,6 @@ else:
             st.rerun()
 
         st.title("My Profile")
-
         st.write("👤 Username:", st.session_state.user.get("username"))
         st.write("📧 Email:", st.session_state.user.get("email"))
 

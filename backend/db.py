@@ -1,4 +1,5 @@
 import sqlite3
+import bcrypt
 
 # ---------------- CREATE TABLE ----------------
 def create_table():
@@ -18,39 +19,53 @@ def create_table():
     conn.close()
 
 
-# ---------------- REGISTER USER ----------------
+# ---------------- REGISTER (HASH PASSWORD) ----------------
 def register_user(username, email, password):
     conn = sqlite3.connect("users.db")
     cursor = conn.cursor()
 
-    create_table()  # ✅ Ensure table exists
+    email = email.strip()
 
-    try:
-        cursor.execute(
-            "INSERT INTO users (username, email, password) VALUES (?, ?, ?)",
-            (username, email, password)
-        )
-        conn.commit()
-        conn.close()
-        return "success"
-    except sqlite3.IntegrityError:
+    # check if user exists
+    cursor.execute("SELECT * FROM users WHERE email=?", (email,))
+    if cursor.fetchone():
         conn.close()
         return "exists"
 
+    # 🔐 HASH PASSWORD
+    hashed_pw = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
 
-# ---------------- LOGIN USER ----------------
+    cursor.execute(
+        "INSERT INTO users (username, email, password) VALUES (?, ?, ?)",
+        (username, email, hashed_pw)
+    )
+
+    conn.commit()
+    conn.close()
+
+    return "success"
+
+
+# ---------------- LOGIN (VERIFY HASH) ----------------
 def login_user(email, password):
     conn = sqlite3.connect("users.db")
     cursor = conn.cursor()
 
-    create_table()  # ✅ Ensure table exists
+    email = email.strip()
 
     cursor.execute(
-        "SELECT id, username, email FROM users WHERE email=? AND password=?",
-        (email, password)
+        "SELECT id, username, email, password FROM users WHERE email=?",
+        (email,)
     )
 
     user = cursor.fetchone()
     conn.close()
 
-    return user
+    if user:
+        user_id, username, email, hashed_pw = user
+
+        # 🔐 CHECK HASHED PASSWORD
+        if bcrypt.checkpw(password.encode('utf-8'), hashed_pw):
+            return user
+
+    return None
