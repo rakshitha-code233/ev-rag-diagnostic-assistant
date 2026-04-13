@@ -6,122 +6,60 @@ from datetime import datetime
 # ---------------- PAGE CONFIG ----------------
 st.set_page_config(page_title="EV Assistant", layout="wide")
 
-# ---------------- CSS ----------------
+# ---------------- CSS (UPDATED ONLY THIS) ----------------
 st.markdown("""
 <style>
 
-/* BACKGROUND */
+/* Background */
 .stApp {
     background: linear-gradient(135deg, #0b1f4a, #132f6b, #1f4ed8);
+    color: white;
 }
-header {visibility: hidden;}
 
-/* TITLE */
-.ev-title {
-    background: linear-gradient(90deg, #60a5fa, #38bdf8);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    font-size: 48px;
+/* Sidebar */
+section[data-testid="stSidebar"] {
+    background: #081a3a !important;
+}
+
+/* Sidebar buttons */
+section[data-testid="stSidebar"] button {
+    background: transparent;
+    color: white;
+    border-radius: 8px;
+    padding: 6px;
+}
+section[data-testid="stSidebar"] button:hover {
+    background: rgba(255,255,255,0.1);
+}
+
+/* ✅ NORMAL SMALL GLOW BUTTONS */
+div.stButton > button {
+    height: 40px;
+    font-size: 14px;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.08);
+    color: white;
+    border: none;
+    box-shadow: 0 0 8px rgba(0,200,255,0.3);
+    transition: 0.2s;
+}
+
+div.stButton > button:hover {
+    box-shadow: 0 0 15px rgba(0,255,255,0.6);
+    transform: scale(1.03);
+}
+
+/* Title */
+.title {
+    font-size: 40px;
     font-weight: bold;
 }
-
-/* CARD */
-.card-btn {
-    position: relative;
-    background: rgba(255,255,255,0.06);
-    backdrop-filter: blur(12px);
-    border-radius: 18px;
-    padding: 30px;
-    text-align: center;
-    color: white;
-    cursor: pointer;
-    border: 1px solid rgba(255,255,255,0.15);
-    transition: all 0.35s ease;
-    overflow: hidden;
+.blue {
+    color: #60a5fa;
 }
 
-/* GLOW BORDER */
-.card-btn::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    border-radius: 18px;
-    padding: 1px;
-    background: linear-gradient(120deg, #60a5fa, transparent, #3b82f6);
-    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-    -webkit-mask-composite: xor;
-            mask-composite: exclude;
-    opacity: 0.4;
-}
-
-/* SHINE */
-.card-btn::after {
-    content: "";
-    position: absolute;
-    top: -50%;
-    left: -50%;
-    width: 200%;
-    height: 200%;
-    background: linear-gradient(120deg, transparent, rgba(255,255,255,0.2), transparent);
-    transform: rotate(25deg);
-    opacity: 0;
-}
-
-/* HOVER */
-.card-btn:hover {
-    transform: translateY(-10px) scale(1.03);
-    box-shadow: 0 0 30px rgba(96,165,250,0.6);
-}
-.card-btn:hover::after {
-    opacity: 1;
-    animation: shine 1.2s linear;
-}
-
-@keyframes shine {
-    from { transform: translateX(-100%) rotate(25deg); }
-    to { transform: translateX(100%) rotate(25deg); }
-}
-
-/* ICON */
-.card-icon {
-    font-size: 40px;
-    margin-bottom: 10px;
-}
-
-/* CHAT */
-[data-testid="stChatMessage"] {
-    background: rgba(255,255,255,0.08);
-    border-radius: 12px;
-    color: white;
-}
-
-/* INPUT */
-textarea, input {
-    background-color: #1e3a8a !important;
-    color: white !important;
-}
-
-/* HISTORY */
-.history-box {
-    background: rgba(255,255,255,0.08);
-    padding: 12px;
-    border-radius: 10px;
-    margin-bottom: 10px;
-    color: white;
-}
-.history-box:hover {
-    background: rgba(255,255,255,0.15);
-    box-shadow: 0 0 10px rgba(96,165,250,0.4);
-}
-
-/* PROFILE */
-.profile-card {
-    background: rgba(255,255,255,0.1);
-    padding: 20px;
-    border-radius: 12px;
-    color: white;
-    width: 300px;
-}
+/* Hide top bar */
+header {visibility: hidden;}
 
 </style>
 """, unsafe_allow_html=True)
@@ -136,7 +74,7 @@ if "user" not in st.session_state:
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-if "history" not in st.session_state or not isinstance(st.session_state.history, list):
+if "history" not in st.session_state:
     st.session_state.history = []
 
 # ---------------- LOGIN ----------------
@@ -149,6 +87,7 @@ if st.session_state.page == "login":
 
     if st.button("Login"):
         user = login_user(email, password)
+
         if user:
             st.session_state.user = {
                 "username": user[1],
@@ -185,73 +124,93 @@ elif st.session_state.page == "signup":
             result = register_user(username, email, password)
 
             if result == "success":
-                st.success("Account created successfully")
+                st.success("Account created")
                 st.session_state.page = "login"
                 st.rerun()
-
-            elif result == "exists":
+            else:
                 st.error("Email already exists")
 
-    if st.button("Back"):
+    if st.button("⬅ Back"):
         st.session_state.page = "login"
         st.rerun()
 
 # ---------------- MAIN APP ----------------
 else:
 
-    # -------- TOP BAR --------
-    col1, col2 = st.columns([1,10])
+    # -------- SIDEBAR --------
+    with st.sidebar:
 
-    # PROFILE LEFT
-    with col1:
-        if st.button("👤"):
-            st.session_state.page = "profile"
-            st.rerun()
+        st.markdown("## ⚡ EV Assistant")
 
-    with col2:
-        st.markdown("<h2 class='ev-title'>EV Diagnostic Assistant</h2>", unsafe_allow_html=True)
+        if st.button("🏠 Dashboard"):
+            st.session_state.page = "dashboard"
 
-    # ---------------- PROFILE PAGE ----------------
-    if st.session_state.page == "profile":
+        if st.button("🤖 EV Assistant"):
+            st.session_state.page = "chat"
 
-        st.header("My Profile")
+        if st.button("🕘 Chat History"):
+            st.session_state.page = "history"
 
-        st.write("Name:", st.session_state.user["username"])
-        st.write("Email:", st.session_state.user["email"])
+        if st.button("📄 Upload Manuals"):
+            st.session_state.page = "upload"
 
-        if st.button("Logout"):
+        st.markdown("<br><br><br><br>", unsafe_allow_html=True)
+
+        if st.button("🚪 Logout"):
             st.session_state.clear()
             st.session_state.page = "login"
             st.rerun()
 
-        if st.button("⬅ Back"):
+    # -------- PROFILE ICON --------
+    col1, col2 = st.columns([10,1])
+    with col2:
+        if st.button("👤"):
+            st.session_state.page = "profile"
+            st.rerun()
+
+    # ---------------- PROFILE ----------------
+    if st.session_state.page == "profile":
+
+        if st.button("⬅"):
             st.session_state.page = "dashboard"
             st.rerun()
 
-    # ---------------- DASHBOARD ----------------
+        st.title("My Profile")
+
+        st.write("👤 Username:", st.session_state.user.get("username"))
+        st.write("📧 Email:", st.session_state.user.get("email"))
+
+    # ---------------- DASHBOARD (UPDATED ONLY THIS) ----------------
     elif st.session_state.page == "dashboard":
 
-        # ✅ FIXED ORDER
-        st.markdown("<h3>Welcome to</h3>", unsafe_allow_html=True)
-        st.markdown("<h1 class='ev-title'>EV Diagnostic Assistant</h1>", unsafe_allow_html=True)
+        st.markdown("<div class='title'>Welcome to</div>", unsafe_allow_html=True)
+        st.markdown("<div class='title blue'>EV Diagnostic Assistant</div>", unsafe_allow_html=True)
+
+        st.markdown("<br>", unsafe_allow_html=True)
 
         col1, col2, col3 = st.columns(3)
 
-        # ✅ CLICKABLE CARDS
         with col1:
             if st.button("🤖 EV Assistant", use_container_width=True):
                 st.session_state.page = "chat"
+                st.rerun()
 
         with col2:
-            if st.button("📄 Upload Manuals", use_container_width=True):
+            if st.button("📂 Upload Manuals", use_container_width=True):
                 st.session_state.page = "upload"
+                st.rerun()
 
         with col3:
-            if st.button("🕘 Chat History", use_container_width=True):
+            if st.button("📜 Chat History", use_container_width=True):
                 st.session_state.page = "history"
+                st.rerun()
 
     # ---------------- CHAT ----------------
     elif st.session_state.page == "chat":
+
+        if st.button("⬅"):
+            st.session_state.page = "dashboard"
+            st.rerun()
 
         st.header("EV Assistant")
 
@@ -259,7 +218,7 @@ else:
             with st.chat_message(msg["role"]):
                 st.markdown(msg["content"])
 
-        user_input = st.chat_input("Ask question...")
+        user_input = st.chat_input("Ask EV question...")
 
         if user_input:
             st.session_state.messages.append({"role": "user", "content": user_input})
@@ -279,17 +238,24 @@ else:
     # ---------------- HISTORY ----------------
     elif st.session_state.page == "history":
 
+        if st.button("⬅"):
+            st.session_state.page = "dashboard"
+            st.rerun()
+
         st.header("Chat History")
 
         for i, item in enumerate(st.session_state.history):
-
-            if st.button(f"{item['time']} - {item['question']}", key=f"h{i}"):
+            if st.button(f"{item['time']} - {item['question']}", key=i):
                 st.session_state.messages = item["chat"]
                 st.session_state.page = "chat"
                 st.rerun()
 
     # ---------------- UPLOAD ----------------
     elif st.session_state.page == "upload":
+
+        if st.button("⬅"):
+            st.session_state.page = "dashboard"
+            st.rerun()
 
         st.header("Upload Manuals")
 
@@ -300,7 +266,3 @@ else:
                 f.write(file.read())
 
             st.success("Uploaded successfully")
-
-        if st.button("⬅ Back"):
-            st.session_state.page = "dashboard"
-            st.rerun()
