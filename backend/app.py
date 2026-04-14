@@ -1,41 +1,45 @@
+import re
+import os
 import streamlit as st
-from db import register_user, login_user,create_table
+import fitz  # ✅ PyMuPDF (FIXED PDF extraction)
+from db import register_user, login_user, create_table, init_db
 from query import get_answer
 from datetime import datetime
+from PyPDF2 import PdfReader
+import faiss
+import numpy as np
+from sentence_transformers import SentenceTransformer
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# ---------------- MODEL ----------------
+@st.cache_resource
+def load_model():
+    return SentenceTransformer("paraphrase-MiniLM-L3-v2")
+
+embed_model = load_model()
 
 # ---------------- PAGE CONFIG ----------------
 st.set_page_config(page_title="EV Assistant", layout="wide")
 
-# ---------------- CREATE TABLE ----------------
+# ---------------- DB INIT ----------------
+init_db()
 create_table()
 
-# ---------------- CSS (UPDATED ONLY THIS) ----------------
+# ---------------- CSS ----------------
 st.markdown("""
 <style>
 
-/* Background */
 .stApp {
     background: linear-gradient(135deg, #0b1f4a, #132f6b, #1f4ed8);
     color: white;
 }
 
-/* Sidebar */
-section[data-testid="stSidebar"] {
+section{
     background: #081a3a !important;
 }
 
-/* Sidebar buttons */
-section[data-testid="stSidebar"] button {
-    background: transparent;
-    color: white;
-    border-radius: 8px;
-    padding: 6px;
-}
-section[data-testid="stSidebar"] button:hover {
-    background: rgba(255,255,255,0.1);
-}
-
-/* ✅ NORMAL SMALL GLOW BUTTONS */
 div.stButton > button {
     height: 40px;
     font-size: 14px;
@@ -52,7 +56,6 @@ div.stButton > button:hover {
     transform: scale(1.03);
 }
 
-/* Title */
 .title {
     font-size: 40px;
     font-weight: bold;
@@ -61,13 +64,13 @@ div.stButton > button:hover {
     color: #60a5fa;
 }
 
-/* Hide top bar */
-header {visibility: hidden;}
-
 </style>
 """, unsafe_allow_html=True)
 
 # ---------------- SESSION ----------------
+if "manual_uploaded" not in st.session_state:
+    st.session_state.manual_uploaded = False
+
 if "page" not in st.session_state:
     st.session_state.page = "login"
 
@@ -92,10 +95,7 @@ if st.session_state.page == "login":
         user = login_user(email, password)
 
         if user:
-            st.session_state.user = {
-                "username": user[1],
-                "email": user[2]
-            }
+            st.session_state.user = user
             st.session_state.page = "dashboard"
             st.rerun()
         else:
@@ -140,36 +140,38 @@ elif st.session_state.page == "signup":
 # ---------------- MAIN APP ----------------
 else:
 
-    # -------- SIDEBAR TOGGLE --------
-    st.set_page_config (
-        page_title="EV Assistant",layout="wide",
-        initial_sidebar_state="expanded"  # ✅ always visible
+    st.set_page_config(
+        page_title="EV Assistant",
+        layout="wide",
+        initial_sidebar_state="expanded"
     )
+
+    # ---------------- SIDEBAR ----------------
     with st.sidebar:
 
-            st.markdown("## ⚡ EV Assistant")
+        st.markdown("## ⚡ EV Assistant")
 
-            if st.button("🏠 Dashboard"):
-                st.session_state.page = "dashboard"
+        if st.button("🏠 Dashboard"):
+            st.session_state.page = "dashboard"
 
-            if st.button("🤖 EV Assistant"):
-                st.session_state.page = "chat"
+        if st.button("🤖 EV Assistant"):
+            st.session_state.page = "chat"
 
-            if st.button("🕘 Chat History"):
-                st.session_state.page = "history"
+        if st.button("🕘 Chat History"):
+            st.session_state.page = "history"
 
-            if st.button("📄 Upload Manuals"):
-                st.session_state.page = "upload"
+        if st.button("📄 Upload Manuals"):
+            st.session_state.page = "upload"
 
-            st.markdown("<br><br><br><br>", unsafe_allow_html=True)
+        st.markdown("<br><br><br><br>", unsafe_allow_html=True)
 
-        # Logout at bottom
-            if st.button("🚪 Logout"):
-                st.session_state.clear()
-                st.session_state.page = "login"
-                st.rerun()
-    # -------- PROFILE ICON --------
-    col1, col2 = st.columns([10,1])
+        if st.button("🚪 Logout"):
+            st.session_state.clear()
+            st.session_state.page = "login"
+            st.rerun()
+
+    # ---------------- PROFILE ICON ----------------
+    col1, col2 = st.columns([10, 1])
     with col2:
         if st.button("👤"):
             st.session_state.page = "profile"
@@ -182,17 +184,16 @@ else:
             st.session_state.page = "dashboard"
             st.rerun()
 
+        user = st.session_state.get("user", {})
         st.title("My Profile")
-        st.write("👤 Username:", st.session_state.user.get("username"))
-        st.write("📧 Email:", st.session_state.user.get("email"))
+        st.write("Username:", user.get("username", "Not found"))
+        st.write("Email:", user.get("email", "Not found"))
 
-    # ---------------- DASHBOARD (UPDATED ONLY THIS) ----------------
+    # ---------------- DASHBOARD ----------------
     elif st.session_state.page == "dashboard":
 
         st.markdown("<div class='title'>Welcome to</div>", unsafe_allow_html=True)
         st.markdown("<div class='title blue'>EV Diagnostic Assistant</div>", unsafe_allow_html=True)
-
-        st.markdown("<br>", unsafe_allow_html=True)
 
         col1, col2, col3 = st.columns(3)
 
@@ -228,6 +229,7 @@ else:
 
         if user_input:
             st.session_state.messages.append({"role": "user", "content": user_input})
+
             try:
                 response = get_answer(user_input)
             except Exception as e:
@@ -258,7 +260,7 @@ else:
                 st.session_state.page = "chat"
                 st.rerun()
 
-    # ---------------- UPLOAD ----------------
+    # ---------------- UPLOAD (FIXED PART) ----------------
     elif st.session_state.page == "upload":
 
         if st.button("⬅"):
@@ -267,10 +269,53 @@ else:
 
         st.header("Upload Manuals")
 
+        # Clear old manual
+        if st.button("🗑 Clear Old Manual"):
+            if os.path.exists("stored_chunks.txt"):
+                os.remove("stored_chunks.txt")
+            st.session_state.manual_uploaded = False
+            st.success("Old manual deleted!")
+
         file = st.file_uploader("Upload PDF", type=["pdf"])
 
         if file:
-            with open("temp.pdf", "wb") as f:
-                f.write(file.read())
-    
-            st.success("Uploaded successfully")
+
+            with st.spinner("Processing manual..."):
+
+                # ✅ FIXED EXTRACTION USING PyMuPDF
+                doc = fitz.open(stream=file.read(), filetype="pdf")
+
+                text = ""
+                for page in doc:
+                    text += page.get_text("text") + "\n"
+
+                text = re.sub(r'\s+', ' ', text)
+
+                sentences = re.split(r'(?<=[.!?])\s+', text)
+
+                cleaned = []
+
+                for s in sentences:
+                    s = s.strip()
+
+                    if len(s) < 40:
+                        continue
+
+                    if s.isupper():
+                        continue
+
+                    if any(word in s.lower() for word in [
+                        "trademark", "status area",
+                        "touchscreen", "display"
+                    ]):
+                        continue
+
+                    cleaned.append(s)
+
+                # Save chunks
+                with open("stored_chunks.txt", "w", encoding="utf-8") as f:
+                    for s in cleaned:
+                        f.write(s + "\n")
+
+            st.session_state.manual_uploaded = True
+            st.success("✅ Manual uploaded successfully!")

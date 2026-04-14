@@ -1,8 +1,10 @@
 import sqlite3
 import bcrypt
 
-# ---------------- CREATE TABLE ----------------
+DB_NAME = "users.db"
 def create_table():
+    import sqlite3
+
     conn = sqlite3.connect("users.db")
     cursor = conn.cursor()
 
@@ -17,23 +19,35 @@ def create_table():
 
     conn.commit()
     conn.close()
-
-
-# ---------------- REGISTER (HASH PASSWORD) ----------------
-def register_user(username, email, password):
-    conn = sqlite3.connect("users.db")
+# ---------------- INIT TABLE ----------------
+def init_db():
+    conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
 
-    email = email.strip()
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT NOT NULL,
+        email TEXT UNIQUE NOT NULL,
+        password TEXT NOT NULL
+    )
+    """)
 
-    # check if user exists
+    conn.commit()
+    conn.close()
+
+
+# ---------------- REGISTER USER ----------------
+def register_user(username, email, password):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+
     cursor.execute("SELECT * FROM users WHERE email=?", (email,))
     if cursor.fetchone():
         conn.close()
         return "exists"
 
-    # 🔐 HASH PASSWORD
-    hashed_pw = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+    hashed_pw = bcrypt.hashpw(password.encode(), bcrypt.gensalt())
 
     cursor.execute(
         "INSERT INTO users (username, email, password) VALUES (?, ?, ?)",
@@ -42,16 +56,13 @@ def register_user(username, email, password):
 
     conn.commit()
     conn.close()
-
     return "success"
 
 
-# ---------------- LOGIN (VERIFY HASH) ----------------
+# ---------------- LOGIN USER ----------------
 def login_user(email, password):
-    conn = sqlite3.connect("users.db")
+    conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-
-    email = email.strip()
 
     cursor.execute(
         "SELECT id, username, email, password FROM users WHERE email=?",
@@ -62,10 +73,13 @@ def login_user(email, password):
     conn.close()
 
     if user:
-        user_id, username, email, hashed_pw = user
+        user_id, username, email_db, hashed_pw = user
 
-        # 🔐 CHECK HASHED PASSWORD
-        if bcrypt.checkpw(password.encode('utf-8'), hashed_pw):
-            return user
+        if bcrypt.checkpw(password.encode(), hashed_pw):
+            return {
+                "id": user_id,
+                "username": username,
+                "email": email_db
+            }
 
     return None
