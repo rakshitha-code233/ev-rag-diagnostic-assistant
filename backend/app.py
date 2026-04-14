@@ -2,11 +2,13 @@ import streamlit as st
 from db import register_user, login_user,create_table
 from query import get_answer
 from datetime import datetime
+from db import init_db
 
 # ---------------- PAGE CONFIG ----------------
 st.set_page_config(page_title="EV Assistant", layout="wide")
 
 # ---------------- CREATE TABLE ----------------
+init_db()
 create_table()
 
 # ---------------- CSS (UPDATED ONLY THIS) ----------------
@@ -20,18 +22,18 @@ st.markdown("""
 }
 
 /* Sidebar */
-section[data-testid="stSidebar"] {
+section{
     background: #081a3a !important;
 }
 
 /* Sidebar buttons */
-section[data-testid="stSidebar"] button {
+section button {
     background: transparent;
     color: white;
     border-radius: 8px;
     padding: 6px;
 }
-section[data-testid="stSidebar"] button:hover {
+section button:hover {
     background: rgba(255,255,255,0.1);
 }
 
@@ -61,9 +63,6 @@ div.stButton > button:hover {
     color: #60a5fa;
 }
 
-/* Hide top bar */
-header {visibility: hidden;}
-
 </style>
 """, unsafe_allow_html=True)
 
@@ -92,10 +91,7 @@ if st.session_state.page == "login":
         user = login_user(email, password)
 
         if user:
-            st.session_state.user = {
-                "username": user[1],
-                "email": user[2]
-            }
+            st.session_state.user = user
             st.session_state.page = "dashboard"
             st.rerun()
         else:
@@ -182,9 +178,10 @@ else:
             st.session_state.page = "dashboard"
             st.rerun()
 
+        user = st.session_state.get("user", {})
         st.title("My Profile")
-        st.write("👤 Username:", st.session_state.user.get("username"))
-        st.write("📧 Email:", st.session_state.user.get("email"))
+        st.write("Username:", user.get("username"," Not found"))
+        st.write("Email:",   user.get("email"," Not found"))
 
     # ---------------- DASHBOARD (UPDATED ONLY THIS) ----------------
     elif st.session_state.page == "dashboard":
