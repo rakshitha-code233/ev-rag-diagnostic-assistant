@@ -1,18 +1,19 @@
 import re
+import os
 import streamlit as st
-from db import register_user, login_user,create_table
+import fitz  # ✅ PyMuPDF (FIXED PDF extraction)
+from db import register_user, login_user, create_table, init_db
 from query import get_answer
 from datetime import datetime
-from db import init_db
 from PyPDF2 import PdfReader
 import faiss
 import numpy as np
 from sentence_transformers import SentenceTransformer
 from dotenv import load_dotenv
-import os
 
 load_dotenv()
 
+# ---------------- MODEL ----------------
 @st.cache_resource
 def load_model():
     return SentenceTransformer("paraphrase-MiniLM-L3-v2")
@@ -22,37 +23,23 @@ embed_model = load_model()
 # ---------------- PAGE CONFIG ----------------
 st.set_page_config(page_title="EV Assistant", layout="wide")
 
-# ---------------- CREATE TABLE ----------------
+# ---------------- DB INIT ----------------
 init_db()
 create_table()
 
-# ---------------- CSS (UPDATED ONLY THIS) ----------------
+# ---------------- CSS ----------------
 st.markdown("""
 <style>
 
-/* Background */
 .stApp {
     background: linear-gradient(135deg, #0b1f4a, #132f6b, #1f4ed8);
     color: white;
 }
 
-/* Sidebar */
 section{
     background: #081a3a !important;
 }
 
-/* Sidebar buttons */
-section button {
-    background: transparent;
-    color: white;
-    border-radius: 8px;
-    padding: 6px;
-}
-section button:hover {
-    background: rgba(255,255,255,0.1);
-}
-
-/* ✅ NORMAL SMALL GLOW BUTTONS */
 div.stButton > button {
     height: 40px;
     font-size: 14px;
@@ -69,7 +56,6 @@ div.stButton > button:hover {
     transform: scale(1.03);
 }
 
-/* Title */
 .title {
     font-size: 40px;
     font-weight: bold;
@@ -154,36 +140,38 @@ elif st.session_state.page == "signup":
 # ---------------- MAIN APP ----------------
 else:
 
-    # -------- SIDEBAR TOGGLE --------
-    st.set_page_config (
-        page_title="EV Assistant",layout="wide",
-        initial_sidebar_state="expanded"  # ✅ always visible
+    st.set_page_config(
+        page_title="EV Assistant",
+        layout="wide",
+        initial_sidebar_state="expanded"
     )
+
+    # ---------------- SIDEBAR ----------------
     with st.sidebar:
 
-            st.markdown("## ⚡ EV Assistant")
+        st.markdown("## ⚡ EV Assistant")
 
-            if st.button("🏠 Dashboard"):
-                st.session_state.page = "dashboard"
+        if st.button("🏠 Dashboard"):
+            st.session_state.page = "dashboard"
 
-            if st.button("🤖 EV Assistant"):
-                st.session_state.page = "chat"
+        if st.button("🤖 EV Assistant"):
+            st.session_state.page = "chat"
 
-            if st.button("🕘 Chat History"):
-                st.session_state.page = "history"
+        if st.button("🕘 Chat History"):
+            st.session_state.page = "history"
 
-            if st.button("📄 Upload Manuals"):
-                st.session_state.page = "upload"
+        if st.button("📄 Upload Manuals"):
+            st.session_state.page = "upload"
 
-            st.markdown("<br><br><br><br>", unsafe_allow_html=True)
+        st.markdown("<br><br><br><br>", unsafe_allow_html=True)
 
-        # Logout at bottom
-            if st.button("🚪 Logout"):
-                st.session_state.clear()
-                st.session_state.page = "login"
-                st.rerun()
-    # -------- PROFILE ICON --------
-    col1, col2 = st.columns([10,1])
+        if st.button("🚪 Logout"):
+            st.session_state.clear()
+            st.session_state.page = "login"
+            st.rerun()
+
+    # ---------------- PROFILE ICON ----------------
+    col1, col2 = st.columns([10, 1])
     with col2:
         if st.button("👤"):
             st.session_state.page = "profile"
@@ -198,16 +186,14 @@ else:
 
         user = st.session_state.get("user", {})
         st.title("My Profile")
-        st.write("Username:", user.get("username"," Not found"))
-        st.write("Email:",   user.get("email"," Not found"))
+        st.write("Username:", user.get("username", "Not found"))
+        st.write("Email:", user.get("email", "Not found"))
 
-    # ---------------- DASHBOARD (UPDATED ONLY THIS) ----------------
+    # ---------------- DASHBOARD ----------------
     elif st.session_state.page == "dashboard":
 
         st.markdown("<div class='title'>Welcome to</div>", unsafe_allow_html=True)
         st.markdown("<div class='title blue'>EV Diagnostic Assistant</div>", unsafe_allow_html=True)
-
-        st.markdown("<br>", unsafe_allow_html=True)
 
         col1, col2, col3 = st.columns(3)
 
@@ -243,6 +229,7 @@ else:
 
         if user_input:
             st.session_state.messages.append({"role": "user", "content": user_input})
+
             try:
                 response = get_answer(user_input)
             except Exception as e:
@@ -273,7 +260,7 @@ else:
                 st.session_state.page = "chat"
                 st.rerun()
 
-    # ---------------- UPLOAD ----------------
+    # ---------------- UPLOAD (FIXED PART) ----------------
     elif st.session_state.page == "upload":
 
         if st.button("⬅"):
@@ -282,81 +269,53 @@ else:
 
         st.header("Upload Manuals")
 
+        # Clear old manual
+        if st.button("🗑 Clear Old Manual"):
+            if os.path.exists("stored_chunks.txt"):
+                os.remove("stored_chunks.txt")
+            st.session_state.manual_uploaded = False
+            st.success("Old manual deleted!")
+
         file = st.file_uploader("Upload PDF", type=["pdf"])
 
-    # ✅ Show status (INSIDE BLOCK)
-        if st.session_state.manual_uploaded:
-            st.success("⚡ Manual already uploaded and ready!")
-
-    # ✅ PROCESS FILE
         if file:
 
-            with st.spinner("🚀 Processing manual..."):
+            with st.spinner("Processing manual..."):
 
-                reader = PdfReader(file)
+                # ✅ FIXED EXTRACTION USING PyMuPDF
+                doc = fitz.open(stream=file.read(), filetype="pdf")
+
                 text = ""
+                for page in doc:
+                    text += page.get_text("text") + "\n"
 
-                for page in reader.pages:
-                    page_text = page.extract_text()
-                    if page_text:
-                        lines = page_text.split("\n")
+                text = re.sub(r'\s+', ' ', text)
 
-                        for line in lines:
-                            line = line.strip()
-                            if len(line) < 50 :  # ✅ filter out short lines
-                                continue
-                            if line.isupper():
-                                continue
-                            if"...." in line:
-                                continue
-                            if "page" in line.lower():
-                                continue
-                            if "note" in line.lower():
-                                continue
-                            if "warning" in line.lower():
-                                continue
-                            if "("in line and")" in line:
-                                continue
-                            if line.startswith(")")or line.startswith("-"):
-                                continue    
-                            text += line + " "
+                sentences = re.split(r'(?<=[.!?])\s+', text)
 
-            # ✅ Chunking
-                def split_into_chunks(text):
-                    import re
-                    sentences = re.split(r'(?<=[.!?]) +', text)
-                    chunks = []
-                    chunk = ""
+                cleaned = []
 
-                    for sentence in sentences:
-                        if len(chunk) + len(sentence) < 200:
-                            chunk += sentence + ". "
-                        else:
-                            chunks.append(chunk.strip())
-                            chunk = sentence
+                for s in sentences:
+                    s = s.strip()
 
-                    if chunk:
-                        chunks.append(chunk.strip())
+                    if len(s) < 40:
+                        continue
 
-                    return chunks
-                
-                chunks = split_into_chunks(text)    
-            # ✅ Save chunks
+                    if s.isupper():
+                        continue
+
+                    if any(word in s.lower() for word in [
+                        "trademark", "status area",
+                        "touchscreen", "display"
+                    ]):
+                        continue
+
+                    cleaned.append(s)
+
+                # Save chunks
                 with open("stored_chunks.txt", "w", encoding="utf-8") as f:
-                    for c in chunks:
-                        f.write(c + "\n")
-                        st.write("sample chunk:", chunks[3])  # ✅ show sample chunk
+                    for s in cleaned:
+                        f.write(s + "\n")
 
-            # ✅ Embeddings
-                embeddings = embed_model.encode(chunks)
-
-                dimension = embeddings.shape[1]
-                index = faiss.IndexFlatL2(dimension)
-                index.add(np.array(embeddings))
-
-                faiss.write_index(index, "faiss_index.index")
-
-            # ✅ Mark uploaded
-                st.session_state.manual_uploaded = True
-
+            st.session_state.manual_uploaded = True
             st.success("✅ Manual uploaded successfully!")
