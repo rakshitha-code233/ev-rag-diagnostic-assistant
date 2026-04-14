@@ -1,8 +1,23 @@
+import re
 import streamlit as st
 from db import register_user, login_user,create_table
 from query import get_answer
 from datetime import datetime
 from db import init_db
+from PyPDF2 import PdfReader
+import faiss
+import numpy as np
+from sentence_transformers import SentenceTransformer
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+
+@st.cache_resource
+def load_model():
+    return SentenceTransformer("paraphrase-MiniLM-L3-v2")
+
+embed_model = load_model()
 
 # ---------------- PAGE CONFIG ----------------
 st.set_page_config(page_title="EV Assistant", layout="wide")
@@ -67,6 +82,9 @@ div.stButton > button:hover {
 """, unsafe_allow_html=True)
 
 # ---------------- SESSION ----------------
+if "manual_uploaded" not in st.session_state:
+    st.session_state.manual_uploaded = False
+
 if "page" not in st.session_state:
     st.session_state.page = "login"
 
@@ -266,8 +284,79 @@ else:
 
         file = st.file_uploader("Upload PDF", type=["pdf"])
 
+    # ✅ Show status (INSIDE BLOCK)
+        if st.session_state.manual_uploaded:
+            st.success("⚡ Manual already uploaded and ready!")
+
+    # ✅ PROCESS FILE
         if file:
-            with open("temp.pdf", "wb") as f:
-                f.write(file.read())
-    
-            st.success("Uploaded successfully")
+
+            with st.spinner("🚀 Processing manual..."):
+
+                reader = PdfReader(file)
+                text = ""
+
+                for page in reader.pages:
+                    page_text = page.extract_text()
+                    if page_text:
+                        lines = page_text.split("\n")
+
+                        for line in lines:
+                            line = line.strip()
+                            if len(line) < 50 :  # ✅ filter out short lines
+                                continue
+                            if line.isupper():
+                                continue
+                            if"...." in line:
+                                continue
+                            if "page" in line.lower():
+                                continue
+                            if "note" in line.lower():
+                                continue
+                            if "warning" in line.lower():
+                                continue
+                            if "("in line and")" in line:
+                                continue
+                            if line.startswith(")")or line.startswith("-"):
+                                continue    
+                            text += line + " "
+
+            # ✅ Chunking
+                def split_into_chunks(text):
+                    import re
+                    sentences = re.split(r'(?<=[.!?]) +', text)
+                    chunks = []
+                    chunk = ""
+
+                    for sentence in sentences:
+                        if len(chunk) + len(sentence) < 200:
+                            chunk += sentence + ". "
+                        else:
+                            chunks.append(chunk.strip())
+                            chunk = sentence
+
+                    if chunk:
+                        chunks.append(chunk.strip())
+
+                    return chunks
+                
+                chunks = split_into_chunks(text)    
+            # ✅ Save chunks
+                with open("stored_chunks.txt", "w", encoding="utf-8") as f:
+                    for c in chunks:
+                        f.write(c + "\n")
+                        st.write("sample chunk:", chunks[3])  # ✅ show sample chunk
+
+            # ✅ Embeddings
+                embeddings = embed_model.encode(chunks)
+
+                dimension = embeddings.shape[1]
+                index = faiss.IndexFlatL2(dimension)
+                index.add(np.array(embeddings))
+
+                faiss.write_index(index, "faiss_index.index")
+
+            # ✅ Mark uploaded
+                st.session_state.manual_uploaded = True
+
+            st.success("✅ Manual uploaded successfully!")

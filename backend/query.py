@@ -1,29 +1,23 @@
 import os
-from groq import Groq
 from sentence_transformers import SentenceTransformer
 import faiss
-import numpy as np
+import numpy as np  
 from dotenv import load_dotenv
+import re
 
 load_dotenv()
 
-# ------------------ LOAD API ------------------
-client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+documents = []
 
 # ------------------ LOAD MODEL ------------------
 model = SentenceTransformer("all-MiniLM-L6-v2")
 
 # ------------------ LOAD FAISS ------------------
-if os.path.exists("faiss_index.index"):
-    index = faiss.read_index("faiss_index.index")
-else:
-    index = None
 
-# ------------------ LOAD DOCUMENTS ------------------
-file_path = os.path.join(os.path.dirname(__file__), "documents.txt")
-
-with open(file_path, "r", encoding="utf-8") as f:
-    documents = f.readlines()
+def load_index():
+    if os.path.exists("faiss_index.index"):
+        return faiss.read_index("faiss_index.index")
+    return None
 
 # ------------------ GREETINGS ------------------
 def handle_greetings(query):
@@ -36,37 +30,54 @@ def handle_greetings(query):
 
 # ------------------ SEARCH MANUAL ------------------
 def search_manual(query):
-    if index is None:
+
+    import faiss
+    import os
+
+    if not os.path.exists("faiss_index.index"):
         return None
+
+    index = faiss.read_index("faiss_index.index")
 
     query_vector = model.encode([query])
-    D, I = index.search(query_vector, k=2)
+    D, I = index.search(query_vector, k=8)
 
-    # 🔥 STRICT FILTER (important)
-    if D[0][0] > 0.6:
-        return None
+    with open("stored_chunks.txt", "r", encoding="utf-8") as f:
+        chunks = f.readlines()
 
-    results = []
+    query_words = query.lower().split()
+
+    best_chunk = None
+    best_score = 0
+
     for i in I[0]:
-        if i < len(documents):
-            results.append(documents[i].strip())
+        if i < len(chunks):
 
-    return "\n\n".join(results)
+            chunk = chunks[i].strip().lower()
 
+            # ❌ REMOVE IRRELEVANT CONTENT
+            if "camera" in chunk:
+                continue
+            if "key card" in chunk:
+                continue
+            if "navigation" in chunk:
+                continue
+
+            score = sum(1 for word in query_words if word in chunk)
+
+            # 🔥 MUST MATCH CORE WORD
+            if "charge" in query and "charge" not in chunk:
+                continue
+
+            if score > best_score and score >= 2:
+                best_score = score
+                best_chunk = chunk
+
+    if best_chunk:
+        return best_chunk.capitalize()
+
+    return None
 # ------------------ AI FALLBACK ------------------
-def get_ai_answer(query):
-    try:
-        response = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",  # ✅ updated model
-            messages=[
-                {"role": "system", "content": "You are an EV diagnostic assistant."},
-                {"role": "user", "content": query}
-            ]
-        )
-        return response.choices[0].message.content
-    except Exception as e:
-        return f"⚠️ Error: {str(e)}"
-    
 def handle_special_cases(query):
     q = query.lower()
 
@@ -78,8 +89,9 @@ def handle_special_cases(query):
 
     return None
 
+
 # ------------------ MAIN FUNCTION ------------------
-def get_answer(query, use_ai=False):
+def get_answer(query):
 
     # 1. Greeting
     greet = handle_greetings(query)
@@ -91,19 +103,10 @@ def get_answer(query, use_ai=False):
     if special:
         return special
 
-    # 3. Manual search
+    # 3. Manual search ONLY
     manual = search_manual(query)
     if manual:
         return f"📘 From Manual:\n\n{manual}"
 
-    # 4. Ask for AI
-    def get_answer(user_query):
-        manual_answer = search_manual(user_query)
-
-        if manual_answer:
-            return manual_answer
-        else:
-            return "I couldn’t find this in the manual, but here’s an AI-based answer:\n\n" + get_ai_answer(user_query)
-    # 5. AI answer
-    return get_ai_answer(query)
-    print("Manual Answer:", manual_answer)
+    # 4. STRICT MODE (NO AI)
+    return "❌ Answer not found in uploaded manual."
