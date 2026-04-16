@@ -1,0 +1,18 @@
+EV Assistant
+hi
+
+Hello! 👋 Ask me about EV diagnostics.
+
+how to charge tesla model3
+
+📘 From Manual:
+
+touchscreen .
+
+⚡ Manual already uploaded and ready!
+
+NameError: name 'file' is not defined
+Traceback:
+File "D:\ev-rag-diagnostic-assistant\backend\app.py", line 291, in <module>
+    if file:
+       ^^^^
