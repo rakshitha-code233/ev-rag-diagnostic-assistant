@@ -1,3 +1,3 @@
 import os
 
-os.system("streamlit run ../app.py")
+os.system("streamlit run ../backend/rag_workspace.py")
